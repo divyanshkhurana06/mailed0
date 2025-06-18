@@ -35,77 +35,136 @@ const supabase = createClient(
 // Free Hugging Face summarization function
 async function summarizeEmail(subject, from, body) {
   try {
-    const text = `Subject: ${subject}\nFrom: ${from}\n\n${body}`;
+    // Clean the body content first
+    let cleanBody = body;
+    if (isHTML(body)) {
+      // Simple HTML tag removal for Node.js
+      cleanBody = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    
+    // Create a comprehensive text for summarization
+    const text = `Subject: ${subject}\nFrom: ${from}\n\n${cleanBody}`;
+    
+    console.log('Summarizing email:', subject);
+    console.log('Text length for summarization:', text.length);
+    console.log('Text preview:', text.substring(0, 200) + '...');
     
     // Use Hugging Face's free summarization API with timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
     
-    const response = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY || 'hf_demo'}` // Use demo key if no API key
-      },
-      body: JSON.stringify({
-        inputs: text,
-        parameters: {
-          max_length: 150,
-          min_length: 50,
-          do_sample: false
+    // Try multiple models in case one fails
+    const models = [
+      'facebook/bart-large-cnn',
+      'sshleifer/distilbart-cnn-12-6',
+      'google/pegasus-xsum'
+    ];
+    
+    let summary = null;
+    let lastError = null;
+    
+    for (const model of models) {
+      try {
+        console.log(`Trying model: ${model}`);
+        
+        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY || 'hf_demo'}`
+          },
+          body: JSON.stringify({
+            inputs: text.substring(0, 1000), // Limit input length
+            parameters: {
+              max_length: 300, // Increased from 150
+              min_length: 50,  // Increased from 30
+              do_sample: false,
+              num_beams: 3
+            }
+          }),
+          signal: controller.signal
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`Model ${model} response:`, result);
+          
+          if (result[0]?.summary_text) {
+            summary = result[0].summary_text;
+            console.log(`Successfully got summary from ${model}:`, summary);
+            break;
+          }
+        } else {
+          console.log(`Model ${model} failed with status: ${response.status}`);
         }
-      }),
-      signal: controller.signal
-    });
+      } catch (error) {
+        console.log(`Model ${model} error:`, error.message);
+        lastError = error;
+        continue;
+      }
+    }
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
+    if (!summary) {
+      console.log('All Hugging Face models failed, using fallback');
       // Fallback to simple summarization if API fails
+      const fallbackSummary = cleanBody.length > 300 ? cleanBody.substring(0, 300) + '...' : cleanBody;
+      console.log('Using fallback summary:', fallbackSummary);
       return {
         title: subject.length > 50 ? subject.substring(0, 50) + '...' : subject,
         tags: ['general'],
-        preview: body.length > 100 ? body.substring(0, 100) + '...' : body
+        preview: fallbackSummary
       };
     }
 
-    const result = await response.json();
-    const summary = result[0]?.summary_text || body.substring(0, 100);
-
-    // Simple categorization based on keywords
+    // Enhanced categorization based on keywords
     const tags = [];
     const lowerText = text.toLowerCase();
     
-    if (lowerText.includes('meeting') || lowerText.includes('work') || lowerText.includes('project')) {
+    if (lowerText.includes('meeting') || lowerText.includes('work') || lowerText.includes('project') || lowerText.includes('deadline') || lowerText.includes('coding') || lowerText.includes('team')) {
       tags.push('work');
     }
-    if (lowerText.includes('invoice') || lowerText.includes('payment') || lowerText.includes('money')) {
+    if (lowerText.includes('invoice') || lowerText.includes('payment') || lowerText.includes('money') || lowerText.includes('bill') || lowerText.includes('transaction')) {
       tags.push('finance');
     }
-    if (lowerText.includes('event') || lowerText.includes('party') || lowerText.includes('celebration')) {
+    if (lowerText.includes('event') || lowerText.includes('party') || lowerText.includes('celebration') || lowerText.includes('invitation')) {
       tags.push('events');
     }
-    if (lowerText.includes('sale') || lowerText.includes('offer') || lowerText.includes('promotion')) {
+    if (lowerText.includes('sale') || lowerText.includes('offer') || lowerText.includes('promotion') || lowerText.includes('discount') || lowerText.includes('newsletter')) {
       tags.push('marketing');
+    }
+    if (lowerText.includes('confirm') || lowerText.includes('verify') || lowerText.includes('account') || lowerText.includes('signup')) {
+      tags.push('account');
     }
     if (tags.length === 0) {
       tags.push('personal');
     }
 
+    console.log('Final summary:', summary);
+    console.log('Final tags:', tags);
+
     return {
       title: subject.length > 50 ? subject.substring(0, 50) + '...' : subject,
       tags: tags.slice(0, 3), // Max 3 tags
-      preview: summary.length > 100 ? summary.substring(0, 100) + '...' : summary
+      preview: summary // Remove truncation - show full summary
     };
   } catch (error) {
     console.error('Summarization error:', error);
     // Fallback
+    const fallbackSummary = body.length > 300 ? body.substring(0, 300) + '...' : body;
+    console.log('Error fallback summary:', fallbackSummary);
     return {
       title: subject.length > 50 ? subject.substring(0, 50) + '...' : subject,
       tags: ['general'],
-      preview: body.length > 100 ? body.substring(0, 100) + '...' : body
+      preview: fallbackSummary
     };
   }
+}
+
+// Helper function to check if content is HTML
+function isHTML(content) {
+  return content.trim().startsWith('<html') || content.includes('<body') || content.includes('<div');
 }
 
 // Google OAuth routes
@@ -235,19 +294,17 @@ app.get('/api/auth/check', async (req, res) => {
   }
 });
 
-// Email fetching and processing
+// Fetch emails from Gmail
 app.get('/api/emails', async (req, res) => {
   try {
     const { email } = req.query;
-    console.log('Email fetch request for:', email);
-    
     if (!email) {
-      console.log('No email provided in request');
       return res.status(400).json({ error: 'Email is required' });
     }
 
+    console.log('Fetching emails for user:', email);
+
     // Get user's tokens from Supabase
-    console.log('Fetching user tokens from Supabase...');
     const { data: user, error } = await supabase
       .from('users')
       .select('access_token, refresh_token')
@@ -269,108 +326,221 @@ app.get('/api/emails', async (req, res) => {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
+    // Get user's email address
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    const userEmail = profile.data.emailAddress;
+    console.log('User email:', userEmail);
+
     // Fetch recent emails
-    console.log('Fetching emails from Gmail...');
-    try {
-      const response = await gmail.users.messages.list({
-        userId: 'me',
-        maxResults: 20
-      });
-      
-      console.log('Gmail API response:', response.status, response.statusText);
-      console.log('Response data:', JSON.stringify(response.data, null, 2));
-      
-      const { messages } = response.data;
-      console.log(`Found ${messages?.length || 0} messages`);
+    const response = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 20,
+      q: 'is:inbox'
+    });
 
-      if (!messages || messages.length === 0) {
-        console.log('No messages found');
-        return res.json([]);
-      }
+    const emails = [];
+    const messageIds = response.data.messages || [];
 
-      const processedEmails = await Promise.all(
-        messages.map(async (message, index) => {
-          console.log(`Processing message ${index + 1}/${messages.length}`);
-          
-          try {
-            const { data: email } = await gmail.users.messages.get({
-              userId: 'me',
-              id: message.id,
-              format: 'full'
-            });
+    for (const message of messageIds) {
+      try {
+        // Get full message details
+        const messageDetails = await gmail.users.messages.get({
+          userId: 'me',
+          id: message.id,
+          format: 'full'
+        });
 
-            // Extract email content
-            const headers = email.payload.headers;
-            const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-            const from = headers.find(h => h.name === 'From')?.value || 'Unknown Sender';
-            
-            // Get email body
-            let body = '';
-            if (email.payload.parts) {
-              const textPart = email.payload.parts.find(part => part.mimeType === 'text/plain');
-              if (textPart) {
-                body = Buffer.from(textPart.body.data, 'base64').toString();
-              }
-            } else if (email.payload.body.data) {
-              body = Buffer.from(email.payload.body.data, 'base64').toString();
+        const headers = messageDetails.data.payload?.headers || [];
+        const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
+        const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+        const date = headers.find(h => h.name === 'Date')?.value || new Date().toISOString();
+
+        // Extract email body
+        let body = '';
+        let snippet = messageDetails.data.snippet || '';
+
+        if (messageDetails.data.payload?.body?.data) {
+          body = Buffer.from(messageDetails.data.payload.body.data, 'base64').toString('utf-8');
+        } else if (messageDetails.data.payload?.parts) {
+          // Try to find text/plain or text/html part
+          for (const part of messageDetails.data.payload.parts) {
+            if (part.mimeType === 'text/plain' && part.body?.data) {
+              body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+              break;
+            } else if (part.mimeType === 'text/html' && part.body?.data) {
+              body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+              break;
             }
+          }
+        }
 
-            // Try to summarize with Hugging Face API, but fallback if it fails
-            let summary;
-            try {
-              summary = await summarizeEmail(subject, from, body);
-            } catch (summarizationError) {
-              console.log(`Summarization failed for message ${index + 1}, using fallback`);
-              summary = {
-                title: subject.length > 50 ? subject.substring(0, 50) + '...' : subject,
-                tags: ['general'],
-                preview: body.length > 100 ? body.substring(0, 100) + '...' : body
-              };
-            }
+        console.log(`Processing email: ${subject} (${message.id})`);
+        console.log(`Body length: ${body.length}, Snippet: ${snippet.substring(0, 50)}...`);
 
-            return {
+        // Simple categorization without AI summarization
+        const tags = categorizeEmail(subject, from, body || snippet);
+
+        const emailData = {
+          id: message.id,
+          subject,
+          from,
+          date,
+          body: body || snippet,
+          snippet,
+          title: subject.length > 50 ? subject.substring(0, 50) + '...' : subject,
+          tags: tags,
+          preview: snippet.length > 150 ? snippet.substring(0, 150) + '...' : snippet,
+          aiSummary: null // Will be populated on demand
+        };
+
+        emails.push(emailData);
+
+        // Store in Supabase
+        try {
+          const { error } = await supabase
+            .from('emails')
+            .upsert({
               id: message.id,
+              user_email: userEmail,
               subject,
               from,
-              title: summary.title,
-              tags: summary.tags,
-              preview: summary.preview,
-              snippet: email.snippet,
-              date: new Date(parseInt(email.internalDate)).toISOString()
-            };
-          } catch (messageError) {
-            console.error(`Error processing message ${index + 1}:`, messageError);
-            // Return a basic email object if processing fails
-            return {
-              id: message.id,
-              subject: 'Error loading email',
-              from: 'Unknown',
-              title: 'Error loading email',
-              tags: ['error'],
-              preview: 'This email could not be loaded properly.',
-              snippet: '',
-              date: new Date().toISOString()
-            };
-          }
-        })
-      );
+              date,
+              snippet,
+              title: emailData.title,
+              tags: emailData.tags,
+              preview: emailData.preview,
+              created_at: new Date().toISOString()
+            }, {
+              onConflict: 'id'
+            });
 
-      console.log(`Successfully processed ${processedEmails.length} emails`);
-      res.json(processedEmails);
-    } catch (gmailError) {
-      console.error('Gmail API error details:', {
-        message: gmailError.message,
-        status: gmailError.status,
-        code: gmailError.code,
-        errors: gmailError.errors
-      });
-      throw gmailError;
+          if (error) {
+            console.error('Supabase error:', error);
+          }
+        } catch (dbError) {
+          console.error('Database error:', dbError);
+        }
+
+      } catch (messageError) {
+        console.error('Error processing message:', messageError);
+      }
     }
+
+    console.log(`Successfully processed ${emails.length} emails`);
+    res.json(emails);
+
   } catch (error) {
     console.error('Error fetching emails:', error);
-    res.status(500).json({ error: 'Failed to fetch emails', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch emails' });
   }
 });
+
+// On-demand email summarization endpoint
+app.post('/api/emails/:id/summarize', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email: userEmail } = req.body;
+    
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    console.log(`Summarizing email ${id} for user: ${userEmail}`);
+
+    // Get user's tokens from Supabase
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('access_token, refresh_token')
+      .eq('email', userEmail)
+      .single();
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Set up Gmail client
+    oauth2Client.setCredentials({
+      access_token: user.access_token,
+      refresh_token: user.refresh_token
+    });
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Get the specific email
+    const messageDetails = await gmail.users.messages.get({
+      userId: 'me',
+      id: id,
+      format: 'full'
+    });
+
+    const headers = messageDetails.data.payload?.headers || [];
+    const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
+    const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+
+    console.log(`Email subject: ${subject}`);
+    console.log(`Email from: ${from}`);
+
+    // Extract email body
+    let body = '';
+    if (messageDetails.data.payload?.body?.data) {
+      body = Buffer.from(messageDetails.data.payload.body.data, 'base64').toString('utf-8');
+    } else if (messageDetails.data.payload?.parts) {
+      for (const part of messageDetails.data.payload.parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+          break;
+        } else if (part.mimeType === 'text/html' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+          break;
+        }
+      }
+    }
+
+    console.log(`Email body length: ${body.length}`);
+    console.log(`Email body preview: ${body.substring(0, 100)}...`);
+
+    // Generate AI summary
+    const summary = await summarizeEmail(subject, from, body || messageDetails.data.snippet);
+
+    console.log(`Generated summary: ${summary.preview}`);
+
+    res.json({ 
+      summary: summary.preview,
+      tags: summary.tags 
+    });
+
+  } catch (error) {
+    console.error('Error summarizing email:', error);
+    res.status(500).json({ error: 'Failed to summarize email' });
+  }
+});
+
+// Simple email categorization function
+function categorizeEmail(subject, from, body) {
+  const text = `${subject} ${from} ${body}`.toLowerCase();
+  const tags = [];
+  
+  if (text.includes('meeting') || text.includes('work') || text.includes('project') || text.includes('deadline') || text.includes('coding') || text.includes('team')) {
+    tags.push('work');
+  }
+  if (text.includes('invoice') || text.includes('payment') || text.includes('money') || text.includes('bill') || text.includes('transaction')) {
+    tags.push('finance');
+  }
+  if (text.includes('event') || text.includes('party') || text.includes('celebration') || text.includes('invitation')) {
+    tags.push('events');
+  }
+  if (text.includes('sale') || text.includes('offer') || text.includes('promotion') || text.includes('discount') || text.includes('newsletter')) {
+    tags.push('marketing');
+  }
+  if (text.includes('confirm') || text.includes('verify') || text.includes('account') || text.includes('signup')) {
+    tags.push('account');
+  }
+  if (tags.length === 0) {
+    tags.push('personal');
+  }
+  
+  return tags.slice(0, 3);
+}
 
 // Tracking pixel endpoint
 app.get('/api/open', async (req, res) => {

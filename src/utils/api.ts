@@ -29,6 +29,24 @@ export const api = {
     return response.json();
   },
 
+  // On-demand email summarization
+  summarizeEmail: async (emailId: string, userEmail: string): Promise<{ summary: string; tags: string[] }> => {
+    const response = await fetch(`${API_BASE_URL}/emails/${emailId}/summarize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: userEmail }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   // Email tracking
   getTrackingPixelUrl: (emailId: string): string => {
     return `${API_BASE_URL}/open?id=${emailId}`;

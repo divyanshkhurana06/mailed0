@@ -1,4 +1,4 @@
-export type EmailCategory = 'work' | 'finance' | 'events' | 'marketing' | 'personal';
+export type EmailCategory = 'work' | 'finance' | 'events' | 'marketing' | 'account' | 'personal' | 'general';
 
 export interface Email {
   id: string;
@@ -8,7 +8,9 @@ export interface Email {
   tags: EmailCategory[];
   preview: string;
   snippet?: string;
+  body?: string;
   date: string;
+  aiSummary?: string | null; // AI-generated summary (null if not generated yet)
   isRead?: boolean;
 }
 

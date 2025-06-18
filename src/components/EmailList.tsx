@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EmailCard } from './EmailCard';
+import { EmailDetailModal } from './EmailDetailModal';
 import { useNotifications } from './NotificationProvider';
 import { EmailCategory, Email } from '../types/email';
 import { api } from '../utils/api';
@@ -14,6 +15,8 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
   const [emails, setEmails] = useState<Email[]>([]);
   const [visibleEmails, setVisibleEmails] = useState<Email[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [showEmailDetail, setShowEmailDetail] = useState(false);
   const { addNotification } = useNotifications();
 
   // Fetch emails
@@ -89,6 +92,16 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
     );
   };
 
+  const handleEmailClick = (email: Email) => {
+    setSelectedEmail(email);
+    setShowEmailDetail(true);
+  };
+
+  const handleCloseEmailDetail = () => {
+    setShowEmailDetail(false);
+    setSelectedEmail(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -130,6 +143,7 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
             <EmailCard 
               email={email} 
               onClick={() => handleEmailRead(email.id)}
+              onEmailClick={handleEmailClick}
             />
           </div>
         ))}
@@ -144,6 +158,14 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
           <p className="text-white/40">Try adjusting your search or filters</p>
         </div>
       )}
+
+      {/* Email Detail Modal */}
+      <EmailDetailModal
+        email={selectedEmail}
+        isOpen={showEmailDetail}
+        onClose={handleCloseEmailDetail}
+        userEmail={userEmail}
+      />
     </div>
   );
 };

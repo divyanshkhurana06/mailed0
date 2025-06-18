@@ -6,12 +6,19 @@ import { createConfetti } from '../utils/confetti';
 interface EmailCardProps {
   email: Email;
   onClick: () => void;
+  onEmailClick: (email: Email) => void;
 }
 
-export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
+export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick, onEmailClick }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Show email details
+    onEmailClick(email);
+    
+    // Mark as read
     onClick();
     
     // Create confetti effect
