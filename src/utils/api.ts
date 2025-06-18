@@ -23,7 +23,8 @@ export const api = {
   getEmails: async (email: string): Promise<Email[]> => {
     const response = await fetch(`${API_BASE_URL}/emails?email=${encodeURIComponent(email)}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch emails');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.details || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
     }
     return response.json();
   },

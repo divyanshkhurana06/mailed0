@@ -20,14 +20,32 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
   useEffect(() => {
     const fetchEmails = async () => {
       try {
+        console.log('Fetching emails for user:', userEmail);
+        
+        // Add timeout to prevent infinite loading
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
         const fetchedEmails = await api.getEmails(userEmail);
+        clearTimeout(timeoutId);
+        
+        console.log('Emails fetched successfully:', fetchedEmails.length);
         setEmails(fetchedEmails);
       } catch (error) {
         console.error('Error fetching emails:', error);
+        let errorMessage = 'Failed to fetch emails';
+        
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            errorMessage = 'Request timed out. Please try again.';
+          } else {
+            errorMessage = error.message;
+          }
+        }
+        
         addNotification({
-          id: 'error',
           title: 'Error',
-          message: 'Failed to fetch emails. Please try again.',
+          message: errorMessage,
           type: 'error',
         });
       } finally {
@@ -35,10 +53,12 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
       }
     };
 
-    fetchEmails();
-    const interval = setInterval(fetchEmails, 30000); // Refresh every 30 seconds
+    if (userEmail) {
+      fetchEmails();
+      const interval = setInterval(fetchEmails, 30000); // Refresh every 30 seconds
 
-    return () => clearInterval(interval);
+      return () => clearInterval(interval);
+    }
   }, [userEmail, addNotification]);
 
   // Filter emails based on category and search

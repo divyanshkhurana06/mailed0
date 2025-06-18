@@ -37,7 +37,10 @@ async function summarizeEmail(subject, from, body) {
   try {
     const text = `Subject: ${subject}\nFrom: ${from}\n\n${body}`;
     
-    // Use Hugging Face's free summarization API
+    // Use Hugging Face's free summarization API with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
       method: 'POST',
       headers: {
@@ -51,8 +54,11 @@ async function summarizeEmail(subject, from, body) {
           min_length: 50,
           do_sample: false
         }
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       // Fallback to simple summarization if API fails
@@ -233,11 +239,15 @@ app.get('/api/auth/check', async (req, res) => {
 app.get('/api/emails', async (req, res) => {
   try {
     const { email } = req.query;
+    console.log('Email fetch request for:', email);
+    
     if (!email) {
+      console.log('No email provided in request');
       return res.status(400).json({ error: 'Email is required' });
     }
 
     // Get user's tokens from Supabase
+    console.log('Fetching user tokens from Supabase...');
     const { data: user, error } = await supabase
       .from('users')
       .select('access_token, refresh_token')
@@ -245,8 +255,11 @@ app.get('/api/emails', async (req, res) => {
       .single();
 
     if (error || !user) {
+      console.log('User not found or error:', error);
       return res.status(401).json({ error: 'User not authenticated' });
     }
+
+    console.log('User tokens found, setting up Gmail client...');
 
     // Set up Gmail client
     oauth2Client.setCredentials({
@@ -257,55 +270,105 @@ app.get('/api/emails', async (req, res) => {
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     // Fetch recent emails
-    const { data: { messages } } = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: 20
-    });
+    console.log('Fetching emails from Gmail...');
+    try {
+      const response = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults: 20
+      });
+      
+      console.log('Gmail API response:', response.status, response.statusText);
+      console.log('Response data:', JSON.stringify(response.data, null, 2));
+      
+      const { messages } = response.data;
+      console.log(`Found ${messages?.length || 0} messages`);
 
-    const processedEmails = await Promise.all(
-      messages.map(async (message) => {
-        const { data: email } = await gmail.users.messages.get({
-          userId: 'me',
-          id: message.id,
-          format: 'full'
-        });
+      if (!messages || messages.length === 0) {
+        console.log('No messages found');
+        return res.json([]);
+      }
 
-        // Extract email content
-        const headers = email.payload.headers;
-        const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-        const from = headers.find(h => h.name === 'From')?.value || 'Unknown Sender';
-        
-        // Get email body
-        let body = '';
-        if (email.payload.parts) {
-          const textPart = email.payload.parts.find(part => part.mimeType === 'text/plain');
-          if (textPart) {
-            body = Buffer.from(textPart.body.data, 'base64').toString();
+      const processedEmails = await Promise.all(
+        messages.map(async (message, index) => {
+          console.log(`Processing message ${index + 1}/${messages.length}`);
+          
+          try {
+            const { data: email } = await gmail.users.messages.get({
+              userId: 'me',
+              id: message.id,
+              format: 'full'
+            });
+
+            // Extract email content
+            const headers = email.payload.headers;
+            const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
+            const from = headers.find(h => h.name === 'From')?.value || 'Unknown Sender';
+            
+            // Get email body
+            let body = '';
+            if (email.payload.parts) {
+              const textPart = email.payload.parts.find(part => part.mimeType === 'text/plain');
+              if (textPart) {
+                body = Buffer.from(textPart.body.data, 'base64').toString();
+              }
+            } else if (email.payload.body.data) {
+              body = Buffer.from(email.payload.body.data, 'base64').toString();
+            }
+
+            // Try to summarize with Hugging Face API, but fallback if it fails
+            let summary;
+            try {
+              summary = await summarizeEmail(subject, from, body);
+            } catch (summarizationError) {
+              console.log(`Summarization failed for message ${index + 1}, using fallback`);
+              summary = {
+                title: subject.length > 50 ? subject.substring(0, 50) + '...' : subject,
+                tags: ['general'],
+                preview: body.length > 100 ? body.substring(0, 100) + '...' : body
+              };
+            }
+
+            return {
+              id: message.id,
+              subject,
+              from,
+              title: summary.title,
+              tags: summary.tags,
+              preview: summary.preview,
+              snippet: email.snippet,
+              date: new Date(parseInt(email.internalDate)).toISOString()
+            };
+          } catch (messageError) {
+            console.error(`Error processing message ${index + 1}:`, messageError);
+            // Return a basic email object if processing fails
+            return {
+              id: message.id,
+              subject: 'Error loading email',
+              from: 'Unknown',
+              title: 'Error loading email',
+              tags: ['error'],
+              preview: 'This email could not be loaded properly.',
+              snippet: '',
+              date: new Date().toISOString()
+            };
           }
-        } else if (email.payload.body.data) {
-          body = Buffer.from(email.payload.body.data, 'base64').toString();
-        }
+        })
+      );
 
-        // Summarize with free Hugging Face API
-        const summary = await summarizeEmail(subject, from, body);
-
-        return {
-          id: message.id,
-          subject,
-          from,
-          title: summary.title,
-          tags: summary.tags,
-          preview: summary.preview,
-          snippet: email.snippet,
-          date: new Date(parseInt(email.internalDate)).toISOString()
-        };
-      })
-    );
-
-    res.json(processedEmails);
+      console.log(`Successfully processed ${processedEmails.length} emails`);
+      res.json(processedEmails);
+    } catch (gmailError) {
+      console.error('Gmail API error details:', {
+        message: gmailError.message,
+        status: gmailError.status,
+        code: gmailError.code,
+        errors: gmailError.errors
+      });
+      throw gmailError;
+    }
   } catch (error) {
     console.error('Error fetching emails:', error);
-    res.status(500).json({ error: 'Failed to fetch emails' });
+    res.status(500).json({ error: 'Failed to fetch emails', details: error.message });
   }
 });
 
