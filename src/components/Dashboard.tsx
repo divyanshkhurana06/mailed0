@@ -6,7 +6,11 @@ import { FolderSystem } from './FolderSystem';
 import { SearchBar } from './SearchBar';
 import { EmailCategory } from '../types/email';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  userEmail: string;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'folders'>('inbox');
   const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +33,7 @@ export const Dashboard: React.FC = () => {
                   <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Mailed</span>
                 </h1>
                 <p className="text-white/60">AI-powered email transformation</p>
+                <p className="text-white/40 text-sm">Signed in as {userEmail}</p>
               </div>
             </div>
             
@@ -46,6 +51,7 @@ export const Dashboard: React.FC = () => {
             <EmailList 
               category={selectedCategory} 
               searchQuery={searchQuery}
+              userEmail={userEmail}
             />
           )}
           

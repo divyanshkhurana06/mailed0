@@ -2,66 +2,64 @@ import React, { useState, useEffect } from 'react';
 import { EmailCard } from './EmailCard';
 import { useNotifications } from './NotificationProvider';
 import { EmailCategory, Email } from '../types/email';
-import { mockEmails } from '../data/mockEmails';
+import { api } from '../utils/api';
 
 interface EmailListProps {
   category: EmailCategory | 'all';
   searchQuery: string;
+  userEmail: string;
 }
 
-export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery }) => {
-  const [emails, setEmails] = useState<Email[]>(mockEmails);
+export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, userEmail }) => {
+  const [emails, setEmails] = useState<Email[]>([]);
   const [visibleEmails, setVisibleEmails] = useState<Email[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { addNotification } = useNotifications();
+
+  // Fetch emails
+  useEffect(() => {
+    const fetchEmails = async () => {
+      try {
+        const fetchedEmails = await api.getEmails(userEmail);
+        setEmails(fetchedEmails);
+      } catch (error) {
+        console.error('Error fetching emails:', error);
+        addNotification({
+          id: 'error',
+          title: 'Error',
+          message: 'Failed to fetch emails. Please try again.',
+          type: 'error',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEmails();
+    const interval = setInterval(fetchEmails, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [userEmail, addNotification]);
 
   // Filter emails based on category and search
   useEffect(() => {
     let filtered = emails;
     
     if (category !== 'all') {
-      filtered = filtered.filter(email => email.category === category);
+      filtered = filtered.filter(email => email.tags.includes(category));
     }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(email => 
         email.title.toLowerCase().includes(query) ||
-        email.sender.toLowerCase().includes(query) ||
+        email.from.toLowerCase().includes(query) ||
         email.preview.toLowerCase().includes(query)
       );
     }
     
     setVisibleEmails(filtered);
   }, [emails, category, searchQuery]);
-
-  // Simulate new emails arriving
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.8) { // 20% chance every 10 seconds
-        const newEmail: Email = {
-          id: Date.now().toString(),
-          sender: ['Sarah Chen', 'Alex Rivera', 'Maya Patel', 'David Kim'][Math.floor(Math.random() * 4)],
-          title: ['Meeting Reminder', 'Project Update', 'Invoice Ready', 'New Opportunity'][Math.floor(Math.random() * 4)],
-          preview: 'This is a preview of the new email content...',
-          time: 'now',
-          isRead: false,
-          category: ['work', 'finance', 'events', 'marketing'][Math.floor(Math.random() * 4)] as EmailCategory,
-          priority: Math.random() > 0.7 ? 'high' : 'normal',
-          hasAttachment: Math.random() > 0.8,
-        };
-        
-        setEmails(prev => [newEmail, ...prev]);
-        addNotification({
-          id: newEmail.id,
-          title: `${newEmail.sender} – ${newEmail.title}`,
-          message: newEmail.preview,
-          type: 'email',
-        });
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [addNotification]);
 
   const handleEmailRead = (emailId: string) => {
     setEmails(prev => 
@@ -70,6 +68,14 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery }) =
       )
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

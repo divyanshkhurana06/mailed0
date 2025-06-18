@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Star, Paperclip, Clock, Zap, Eye } from 'lucide-react';
-import { Email } from '../types/email';
+import { Star, Paperclip, Clock, Eye } from 'lucide-react';
+import { Email, EmailCategory } from '../types/email';
 import { createConfetti } from '../utils/confetti';
 
 interface EmailCardProps {
@@ -26,7 +26,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
     }
   };
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = (category: EmailCategory) => {
     const colors = {
       work: 'from-blue-500 to-cyan-500',
       finance: 'from-green-500 to-emerald-500',
@@ -34,14 +34,26 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
       marketing: 'from-orange-500 to-red-500',
       personal: 'from-indigo-500 to-purple-500',
     };
-    return colors[category as keyof typeof colors] || 'from-gray-500 to-gray-600';
+    return colors[category] || 'from-gray-500 to-gray-600';
   };
 
-  const getPriorityIcon = () => {
-    if (email.priority === 'high') {
-      return <Zap className="w-4 h-4 text-yellow-400" />;
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    // Less than 24 hours
+    if (diff < 24 * 60 * 60 * 1000) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-    return null;
+    
+    // Less than 7 days
+    if (diff < 7 * 24 * 60 * 60 * 1000) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    }
+    
+    // Otherwise show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
   return (
@@ -57,7 +69,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
     >
       {/* Background glow */}
       <div className={`
-        absolute inset-0 bg-gradient-to-r ${getCategoryColor(email.category)} 
+        absolute inset-0 bg-gradient-to-r ${getCategoryColor(email.tags[0])} 
         rounded-2xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-300
         ${!email.isRead ? 'opacity-10' : ''}
       `} />
@@ -71,21 +83,20 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
-            {/* Category badge */}
-            <div className={`
-              px-3 py-1 bg-gradient-to-r ${getCategoryColor(email.category)} 
-              rounded-full text-xs font-semibold text-white shadow-lg
-            `}>
-              {email.category}
+            {/* Category badges */}
+            <div className="flex gap-2">
+              {email.tags.map((tag, index) => (
+                <div
+                  key={tag}
+                  className={`
+                    px-3 py-1 bg-gradient-to-r ${getCategoryColor(tag)} 
+                    rounded-full text-xs font-semibold text-white shadow-lg
+                  `}
+                >
+                  {tag}
+                </div>
+              ))}
             </div>
-            
-            {/* Priority indicator */}
-            {getPriorityIcon()}
-            
-            {/* Attachment indicator */}
-            {email.hasAttachment && (
-              <Paperclip className="w-4 h-4 text-white/60" />
-            )}
             
             {/* Read status */}
             {!email.isRead && (
@@ -95,7 +106,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
           
           <div className="flex items-center gap-2 text-white/60 text-sm">
             <Clock className="w-4 h-4" />
-            <span>{email.time}</span>
+            <span>{formatDate(email.date)}</span>
           </div>
         </div>
 
@@ -106,7 +117,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
               font-bold text-lg transition-colors duration-300
               ${!email.isRead ? 'text-white' : 'text-white/80'}
             `}>
-              {email.sender} – {email.title}
+              {email.from} – {email.title}
             </h3>
             
             <button className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -124,7 +135,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick }) => {
         
         {/* Bottom glow line */}
         <div className={`
-          absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r ${getCategoryColor(email.category)} 
+          absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r ${getCategoryColor(email.tags[0])} 
           opacity-0 group-hover:opacity-50 transition-opacity duration-300
         `} />
       </div>

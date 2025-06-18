@@ -2,14 +2,14 @@ export type EmailCategory = 'work' | 'finance' | 'events' | 'marketing' | 'perso
 
 export interface Email {
   id: string;
-  sender: string;
+  subject: string;
+  from: string;
   title: string;
+  tags: EmailCategory[];
   preview: string;
-  time: string;
-  isRead: boolean;
-  category: EmailCategory;
-  priority: 'normal' | 'high';
-  hasAttachment: boolean;
+  snippet?: string;
+  date: string;
+  isRead?: boolean;
 }
 
 export interface SentEmail {
