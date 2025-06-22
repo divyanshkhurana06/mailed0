@@ -56,7 +56,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
           )}
           
           {activeTab === 'sent' && (
-            <SentAnalytics searchQuery={searchQuery} />
+            <SentAnalytics searchQuery={searchQuery} userEmail={userEmail} />
           )}
           
           {activeTab === 'folders' && (

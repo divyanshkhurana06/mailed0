@@ -171,6 +171,8 @@ function isHTML(content) {
 app.get('/api/auth/google', (req, res) => {
   const scopes = [
     'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.compose',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile'
   ];
@@ -403,7 +405,7 @@ app.get('/api/emails', async (req, res) => {
               id: message.id,
               user_email: userEmail,
               subject,
-              from,
+              from_address: from,
               date,
               snippet,
               title: emailData.title,
@@ -547,8 +549,11 @@ app.get('/api/open', async (req, res) => {
   try {
     const { id } = req.query;
     if (!id) {
-      return res.status(400).send('Missing email ID');
+      console.log('Missing tracking ID in tracking request');
+      return res.status(400).send('Missing tracking ID');
     }
+
+    console.log(`Tracking pixel accessed for tracking ID: ${id}`);
 
     // Parse user agent
     const ua = new UAParser(req.headers['user-agent']);
@@ -556,33 +561,308 @@ app.get('/api/open', async (req, res) => {
     const browser = ua.getBrowser();
     const os = ua.getOS();
 
-    // Get IP and location (you might want to use a proper IP geolocation service)
-    const ip = req.ip;
-    
+    // Get IP address (handle different proxy scenarios)
+    const ip = req.headers['x-forwarded-for'] || 
+               req.headers['x-real-ip'] || 
+               req.connection.remoteAddress || 
+               req.socket.remoteAddress ||
+               req.ip ||
+               'unknown';
+
+    console.log(`Open details - Device: ${device.type || 'desktop'}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
+
     // Record the open
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('opens')
       .insert({
-        email_id: id,
+        email_id: id, // This is now the tracking_id
         opened_at: new Date().toISOString(),
         device_type: device.type || 'desktop',
         browser: `${browser.name} ${browser.version}`,
         os: `${os.name} ${os.version}`,
         ip_address: ip
-      });
+      })
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error recording open:', error);
+      throw error;
+    }
+
+    console.log(`Successfully recorded open for tracking ID ${id}:`, data);
 
     // Return a 1x1 transparent pixel
     res.writeHead(200, {
       'Content-Type': 'image/gif',
       'Content-Length': '43',
-      'Cache-Control': 'no-cache, no-store, must-revalidate'
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     });
     res.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
   } catch (error) {
     console.error('Error recording email open:', error);
-    res.status(500).send('Error recording open');
+    // Still return the pixel even if recording fails
+    res.writeHead(200, {
+      'Content-Type': 'image/gif',
+      'Content-Length': '43'
+    });
+    res.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
+  }
+});
+
+// Fetch sent emails with tracking analytics
+app.get('/api/emails/sent', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    console.log('Fetching sent emails for user:', email);
+
+    // Get sent emails from our database
+    const { data: sentEmails, error: dbError } = await supabase
+      .from('sent_emails')
+      .select('*')
+      .eq('user_email', email)
+      .order('sent_at', { ascending: false })
+      .limit(20);
+
+    if (dbError) {
+      console.error('Error fetching sent emails:', dbError);
+      return res.status(500).json({ error: 'Failed to fetch sent emails' });
+    }
+
+    console.log(`Found ${sentEmails?.length || 0} sent emails in database`);
+
+    const processedEmails = [];
+
+    for (const sentEmail of sentEmails || []) {
+      try {
+        // Get tracking analytics from Supabase
+        const { data: opens, error: opensError } = await supabase
+          .from('opens')
+          .select('*')
+          .eq('email_id', sentEmail.tracking_id)
+          .order('opened_at', { ascending: false });
+
+        if (opensError) {
+          console.error('Error fetching opens:', opensError);
+        }
+
+        const openCount = opens?.length || 0;
+        const lastOpened = opens?.[0]?.opened_at || null;
+
+        // Get device analytics
+        const deviceStats = {};
+        const locationStats = {};
+        
+        if (opens) {
+          opens.forEach(open => {
+            // Device stats
+            const deviceType = open.device_type || 'unknown';
+            deviceStats[deviceType] = (deviceStats[deviceType] || 0) + 1;
+            
+            // Location stats
+            const location = open.ip_address || 'unknown';
+            locationStats[location] = (locationStats[location] || 0) + 1;
+          });
+        }
+
+        // Simple categorization
+        const tags = categorizeEmail(sentEmail.subject, sentEmail.to_email, sentEmail.body);
+
+        const emailData = {
+          id: sentEmail.id,
+          subject: sentEmail.subject,
+          to: sentEmail.to_email,
+          date: sentEmail.sent_at,
+          body: sentEmail.body,
+          snippet: sentEmail.body.substring(0, 150) + (sentEmail.body.length > 150 ? '...' : ''),
+          title: sentEmail.subject.length > 50 ? sentEmail.subject.substring(0, 50) + '...' : sentEmail.subject,
+          preview: sentEmail.body.length > 150 ? sentEmail.body.substring(0, 150) + '...' : sentEmail.body,
+          tags: tags,
+          trackingId: sentEmail.tracking_id,
+          analytics: {
+            opens: openCount,
+            lastOpened,
+            devices: Object.entries(deviceStats).map(([type, count]) => ({ type, count })),
+            locations: Object.entries(locationStats).map(([location, count]) => ({ location, count })),
+            openHistory: opens?.map(open => ({
+              timestamp: open.opened_at,
+              device: open.device_type,
+              browser: open.browser,
+              os: open.os,
+              location: open.ip_address
+            })) || []
+          }
+        };
+
+        processedEmails.push(emailData);
+
+      } catch (messageError) {
+        console.error('Error processing sent message:', messageError);
+      }
+    }
+
+    console.log(`Successfully processed ${processedEmails.length} sent emails`);
+    res.json(processedEmails);
+
+  } catch (error) {
+    console.error('Error fetching sent emails:', error);
+    res.status(500).json({ error: 'Failed to fetch sent emails' });
+  }
+});
+
+// Send email with tracking pixel
+app.post('/api/emails/send', async (req, res) => {
+  try {
+    const { email: userEmail, to, subject, body } = req.body;
+    
+    if (!userEmail || !to || !subject || !body) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    console.log(`Sending email from ${userEmail} to ${to}: ${subject}`);
+
+    // Get user's tokens from Supabase
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('access_token, refresh_token')
+      .eq('email', userEmail)
+      .single();
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Set up Gmail client
+    oauth2Client.setCredentials({
+      access_token: user.access_token,
+      refresh_token: user.refresh_token
+    });
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Generate a unique tracking ID
+    const trackingId = `track_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create tracking pixel URL
+    const trackingPixelUrl = `${process.env.FRONTEND_URL}/api/open?id=${trackingId}`;
+    
+    // Create HTML email with tracking pixel
+    const htmlBody = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${subject}</title>
+      </head>
+      <body>
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          ${body.replace(/\n/g, '<br>')}
+        </div>
+        <img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />
+      </body>
+      </html>
+    `;
+
+    // Create plain text version
+    const textBody = body;
+
+    // Create the email message
+    const message = {
+      raw: Buffer.from(
+        `To: ${to}\r\n` +
+        `From: ${userEmail}\r\n` +
+        `Subject: ${subject}\r\n` +
+        `MIME-Version: 1.0\r\n` +
+        `Content-Type: multipart/alternative; boundary="boundary"\r\n\r\n` +
+        `--boundary\r\n` +
+        `Content-Type: text/plain; charset="UTF-8"\r\n\r\n` +
+        `${textBody}\r\n\r\n` +
+        `--boundary\r\n` +
+        `Content-Type: text/html; charset="UTF-8"\r\n\r\n` +
+        `${htmlBody}\r\n\r\n` +
+        `--boundary--`
+      ).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    };
+
+    // Send the email
+    const response = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: message
+    });
+
+    console.log('Email sent successfully:', response.data.id);
+
+    // Store the sent email in our database with tracking info
+    const { error: dbError } = await supabase
+      .from('sent_emails')
+      .insert({
+        id: response.data.id,
+        tracking_id: trackingId,
+        user_email: userEmail,
+        to_email: to,
+        subject,
+        body: textBody,
+        html_body: htmlBody,
+        sent_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+
+    if (dbError) {
+      console.error('Error storing sent email:', dbError);
+    }
+
+    res.json({ 
+      success: true, 
+      messageId: response.data.id,
+      trackingId: trackingId
+    });
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+// Endpoint for browser extension to report sent emails
+app.post('/api/extension/email-sent', async (req, res) => {
+  try {
+    console.log('[EXTENSION API] Received email-sent POST:', req.body);
+    const { to, subject, body, trackingId } = req.body;
+    if (!to || !subject || !body || !trackingId) {
+      console.log('[EXTENSION API] Missing required fields');
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Store in sent_emails table
+    const { error } = await supabase
+      .from('sent_emails')
+      .upsert({
+        id: trackingId,
+        tracking_id: trackingId,
+        user_email: 'unknown',
+        to_email: to,
+        subject,
+        body,
+        html_body: body,
+        sent_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+
+    if (error) {
+      console.error('[EXTENSION API] Supabase error:', error);
+      return res.status(500).json({ error: 'Failed to store sent email' });
+    }
+
+    console.log('[EXTENSION API] Email stored successfully');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[EXTENSION API] Extension email-sent error:', error);
+    res.status(500).json({ error: 'Failed to process extension email' });
   }
 });
 

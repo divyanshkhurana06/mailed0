@@ -38,9 +38,25 @@ CREATE TABLE opens (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create sent_emails table for tracking
+CREATE TABLE IF NOT EXISTS sent_emails (
+  id TEXT PRIMARY KEY,
+  tracking_id TEXT UNIQUE NOT NULL,
+  user_email TEXT NOT NULL,
+  to_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  html_body TEXT,
+  sent_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes
 CREATE INDEX idx_emails_user_id ON emails(user_id);
 CREATE INDEX idx_opens_email_id ON opens(email_id);
+CREATE INDEX IF NOT EXISTS idx_sent_emails_user_email ON sent_emails(user_email);
+CREATE INDEX IF NOT EXISTS idx_sent_emails_tracking_id ON sent_emails(tracking_id);
+CREATE INDEX IF NOT EXISTS idx_sent_emails_sent_at ON sent_emails(sent_at);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;

@@ -16,23 +16,31 @@ export interface Email {
 
 export interface SentEmail {
   id: string;
-  recipient: string;
   subject: string;
-  sentAt: string;
-  opens: number;
+  to: string;
+  date: string;
+  title: string;
+  preview: string;
+  body?: string;
+  snippet?: string;
+  tags: EmailCategory[];
   analytics: {
-    opens: Array<{
-      timestamp: string;
-      location: string;
-      device: string;
-    }>;
+    opens: number;
+    lastOpened: string | null;
     devices: Array<{
       type: string;
       count: number;
     }>;
     locations: Array<{
-      city: string;
+      location: string;
       count: number;
+    }>;
+    openHistory: Array<{
+      timestamp: string;
+      device: string;
+      browser: string;
+      os: string;
+      location: string;
     }>;
   };
 }
