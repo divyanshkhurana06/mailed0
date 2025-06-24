@@ -35,6 +35,12 @@ export const SentEmailDetailModal: React.FC<SentEmailDetailModalProps> = ({ emai
     return `Opened ${Math.floor(diffInHours / 24)}d ago`;
   };
 
+  const sanitizeEmailBody = (html: string): string => {
+    if (!html) return '';
+    const pixelRegex = /<img[^>]+src="[^"]+\/api\/open\?id=[^"]+"[^>]*>/g;
+    return html.replace(pixelRegex, '');
+  };
+
   // Function to extract text content from HTML
   const extractTextFromHTML = (html: string): string => {
     const tempDiv = document.createElement('div');
@@ -232,9 +238,10 @@ export const SentEmailDetailModal: React.FC<SentEmailDetailModalProps> = ({ emai
             </h3>
             <div className="bg-white/5 border border-white/10 rounded-xl p-6">
               {email.body ? (
-                <div className="text-white/90 whitespace-pre-wrap leading-relaxed font-mono text-sm">
-                  {getDisplayContent(email.body)}
-                </div>
+                <div 
+                  className="prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: sanitizeEmailBody(email.body) }} 
+                />
               ) : email.snippet ? (
                 <div className="text-white/90 whitespace-pre-wrap leading-relaxed">
                   {getDisplayContent(email.snippet)}

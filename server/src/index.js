@@ -553,29 +553,41 @@ app.get('/api/open', async (req, res) => {
       return res.status(400).send('Missing tracking ID');
     }
 
-    console.log(`Tracking pixel accessed for tracking ID: ${id}`);
-
-    // Parse user agent
-    const ua = new UAParser(req.headers['user-agent']);
+    // Detect Google proxy or sender's own device
+    const uaString = req.headers['user-agent'] || '';
+    const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || req.socket.remoteAddress || req.ip || 'unknown';
+    const ua = new UAParser(uaString);
     const device = ua.getDevice();
     const browser = ua.getBrowser();
     const os = ua.getOS();
 
-    // Get IP address (handle different proxy scenarios)
-    const ip = req.headers['x-forwarded-for'] || 
-               req.headers['x-real-ip'] || 
-               req.connection.remoteAddress || 
-               req.socket.remoteAddress ||
-               req.ip ||
-               'unknown';
+    // List of known Google IP patterns (partial)
+    const googleIpPatterns = [
+      /^66\.102\./, /^66\.249\./, /^64\.233\./, /^72\.14\./, /^203\.208\./, /^209\.85\./, /^216\.239\./, /^74\.125\./, /^173\.194\./, /^207\.126\./, /^216\.58\./, /^172\.217\./, /^108\.177\./, /^35\./, /^34\./
+    ];
+    const isGoogleProxy = googleIpPatterns.some(pattern => pattern.test(ip)) || uaString.toLowerCase().includes('googleimageproxy');
 
+    if (isGoogleProxy) {
+      console.log('Ignoring open from Google proxy:', ip, uaString);
+      // Return the pixel but do not record the open
+      res.writeHead(200, {
+        'Content-Type': 'image/gif',
+        'Content-Length': '43',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      return res.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
+    }
+
+    console.log(`Tracking pixel accessed for tracking ID: ${id}`);
     console.log(`Open details - Device: ${device.type || 'desktop'}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
 
     // Record the open
     const { data, error } = await supabase
       .from('opens')
       .insert({
-        email_id: id, // This is now the tracking_id
+        tracking_id: id, // This is now the tracking_id
         opened_at: new Date().toISOString(),
         device_type: device.type || 'desktop',
         browser: `${browser.name} ${browser.version}`,
@@ -644,7 +656,7 @@ app.get('/api/emails/sent', async (req, res) => {
         const { data: opens, error: opensError } = await supabase
           .from('opens')
           .select('*')
-          .eq('email_id', sentEmail.tracking_id)
+          .eq('tracking_id', sentEmail.tracking_id)
           .order('opened_at', { ascending: false });
 
         if (opensError) {
@@ -769,7 +781,7 @@ app.post('/api/emails/send', async (req, res) => {
     `;
 
     // Create plain text version
-    const textBody = body;
+    const sendBody = req.body.body || '';
 
     // Create the email message
     const message = {
@@ -781,7 +793,7 @@ app.post('/api/emails/send', async (req, res) => {
         `Content-Type: multipart/alternative; boundary="boundary"\r\n\r\n` +
         `--boundary\r\n` +
         `Content-Type: text/plain; charset="UTF-8"\r\n\r\n` +
-        `${textBody}\r\n\r\n` +
+        `${sendBody}\r\n\r\n` +
         `--boundary\r\n` +
         `Content-Type: text/html; charset="UTF-8"\r\n\r\n` +
         `${htmlBody}\r\n\r\n` +
@@ -801,12 +813,12 @@ app.post('/api/emails/send', async (req, res) => {
     const { error: dbError } = await supabase
       .from('sent_emails')
       .insert({
-        id: response.data.id,
+        id: trackingId,
         tracking_id: trackingId,
         user_email: userEmail,
         to_email: to,
         subject,
-        body: textBody,
+        body: sendBody,
         html_body: htmlBody,
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString()
@@ -837,7 +849,7 @@ app.post('/api/extension/email-sent', async (req, res) => {
     const subject = req.body.subject;
     const trackingId = req.body.trackingId;
     const userEmail = req.body.userEmail || 'unknown';
-    // The extension does not send 'body', so do not require it
+    const extensionBody = req.body.body || '';
     if (!to || !subject || !trackingId) {
       console.log('[EXTENSION API] Missing required fields');
       return res.status(400).json({ error: 'Missing required fields' });
@@ -852,7 +864,7 @@ app.post('/api/extension/email-sent', async (req, res) => {
         user_email: userEmail,
         to_email: to,
         subject,
-        body: '',
+        body: extensionBody,
         html_body: '',
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString()
@@ -906,7 +918,7 @@ app.get('/api/sent-emails', async (req, res) => {
         const { data: opens, error: opensError } = await supabase
           .from('opens')
           .select('*')
-          .eq('email_id', email.id)
+          .eq('tracking_id', email.tracking_id)
           .order('opened_at', { ascending: false });
         if (opensError) {
           console.error('[API] Error fetching opens for email', email.id, opensError);

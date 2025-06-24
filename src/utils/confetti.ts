@@ -21,8 +21,8 @@ export const createConfetti = (element: HTMLElement) => {
     // Animation
     const angle = (Math.PI * 2 * i) / confettiCount;
     const velocity = 50 + Math.random() * 50;
-    const vx = Math.cos(angle) * velocity;
-    const vy = Math.sin(angle) * velocity - 100;
+    let vx = Math.cos(angle) * velocity;
+    let vy = Math.sin(angle) * velocity - 100;
     
     let x = 0;
     let y = 0;

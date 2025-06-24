@@ -1,9 +1,6 @@
-// == Mailed Gmail Tracker Content Script ==
-// This script runs on mail.google.com, detects when an email is sent, 
-// injects a tracking pixel, and reports to the backend.
 
 const BACKEND_URL = 'http://localhost:3000/api/extension/email-sent';
-const TRACKING_PIXEL_BASE = 'http://localhost:3000/api/pixel?id=';
+const TRACKING_PIXEL_BASE = 'https://7563-2401-4900-1c74-c868-e117-41f-335d-49c2.ngrok-free.app/api/open?id=';
 
 // This variable will hold the email data captured just before sending.
 let lastComposeData = null;
@@ -63,22 +60,21 @@ function captureComposeData(composeWindow) {
 
     // Generate tracking ID and create pixel
     const trackingId = generateTrackingId();
-    const pixelImg = `<img src="${TRACKING_PIXEL_BASE}${trackingId}" width="1" height="1" style="display:none;" alt="">`;
+    const randomCacheBuster = `&rand=${Math.random().toString(36).substr(2, 5)}`;
+    const pixelImg = `<img src="${TRACKING_PIXEL_BASE}${trackingId}${randomCacheBuster}" width="1" height="1" alt="" border="0" style="border:0;" />`;
     
     // Log the current body content for debugging
     console.log('[Mailed Extension] Current body content:', bodyElement.innerHTML);
     
-    // CRITICAL STEP: Inject the pixel directly into the message body
-    // Only inject the hidden tracking pixel image, not the tracking ID as text
-    const pixelContainer = document.createElement('div');
-    pixelContainer.innerHTML = pixelImg; // Only the image, no text
-    bodyElement.appendChild(pixelContainer);
+    // CRITICAL STEP: Inject the pixel directly into the message body as raw HTML
+    bodyElement.innerHTML += pixelImg;
 
     // Store everything we need to send to the backend
     lastComposeData = {
       to: to,
       subject: subject,
-      trackingId: trackingId
+      trackingId: trackingId,
+      body: bodyElement.innerHTML
     };
 
     console.log('[Mailed Extension] Successfully captured data:', {
@@ -105,6 +101,7 @@ function sendTrackedEmail() {
     toAddress: lastComposeData.to,
     subject: lastComposeData.subject,
     trackingId: lastComposeData.trackingId,
+    body: lastComposeData.body
   };
 
   console.log('[Mailed Extension] Sending to backend:', payload);

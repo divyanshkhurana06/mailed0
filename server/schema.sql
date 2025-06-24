@@ -29,7 +29,7 @@ CREATE TABLE emails (
 -- Create opens table for tracking
 CREATE TABLE opens (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  email_id TEXT REFERENCES emails(id) ON DELETE CASCADE,
+  tracking_id TEXT NOT NULL REFERENCES sent_emails(tracking_id) ON DELETE CASCADE,
   opened_at TIMESTAMP WITH TIME ZONE NOT NULL,
   device_type TEXT,
   browser TEXT,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS sent_emails (
 
 -- Create indexes
 CREATE INDEX idx_emails_user_id ON emails(user_id);
-CREATE INDEX idx_opens_email_id ON opens(email_id);
+CREATE INDEX idx_opens_tracking_id ON opens(tracking_id);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_user_email ON sent_emails(user_email);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_tracking_id ON sent_emails(tracking_id);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_sent_at ON sent_emails(sent_at);
@@ -71,4 +71,4 @@ CREATE POLICY "Users can only access their own emails" ON emails
   FOR ALL USING (user_id = auth.uid());
 
 CREATE POLICY "Users can only access their own email opens" ON opens
-  FOR ALL USING (email_id IN (SELECT id FROM emails WHERE user_id = auth.uid())); 
+  FOR ALL USING (tracking_id IN (SELECT tracking_id FROM sent_emails WHERE user_email = auth.uid())); 
