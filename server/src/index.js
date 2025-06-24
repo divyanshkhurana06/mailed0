@@ -832,8 +832,13 @@ app.post('/api/emails/send', async (req, res) => {
 app.post('/api/extension/email-sent', async (req, res) => {
   try {
     console.log('[EXTENSION API] Received email-sent POST:', req.body);
-    const { to, subject, body, trackingId } = req.body;
-    if (!to || !subject || !body || !trackingId) {
+    // Accept both 'to' and 'toAddress' for compatibility
+    const to = req.body.to || req.body.toAddress;
+    const subject = req.body.subject;
+    const trackingId = req.body.trackingId;
+    const userEmail = req.body.userEmail || 'unknown';
+    // The extension does not send 'body', so do not require it
+    if (!to || !subject || !trackingId) {
       console.log('[EXTENSION API] Missing required fields');
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -844,11 +849,11 @@ app.post('/api/extension/email-sent', async (req, res) => {
       .upsert({
         id: trackingId,
         tracking_id: trackingId,
-        user_email: 'unknown',
+        user_email: userEmail,
         to_email: to,
         subject,
-        body,
-        html_body: body,
+        body: '',
+        html_body: '',
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString()
       }, { onConflict: 'id' });
@@ -863,6 +868,87 @@ app.post('/api/extension/email-sent', async (req, res) => {
   } catch (error) {
     console.error('[EXTENSION API] Extension email-sent error:', error);
     res.status(500).json({ error: 'Failed to process extension email' });
+  }
+});
+
+// --- Tracking Pixel Endpoint (public, no auth required) ---
+app.get('/api/pixel', (req, res) => {
+  const trackingId = req.query.id;
+  console.log(`[TRACKING] Pixel loaded for ID: ${trackingId} at ${new Date().toISOString()}`);
+  // Return a 1x1 transparent GIF
+  const pixel = Buffer.from([
+    71,73,70,56,57,97,1,0,1,0,128,0,0,0,0,0,255,255,255,33,249,4,1,0,0,1,0,44,0,0,0,0,1,0,1,0,0,2,2,68,1,0,59
+  ]);
+  res.set({
+    'Content-Type': 'image/gif',
+    'Cache-Control': 'no-store',
+  });
+  res.send(pixel);
+});
+
+// --- API: Get all sent emails with analytics ---
+app.get('/api/sent-emails', async (req, res) => {
+  try {
+    // Fetch all sent emails
+    const { data: emails, error } = await supabase
+      .from('sent_emails')
+      .select('*')
+      .order('sent_at', { ascending: false });
+    if (error) {
+      console.error('[API] Error fetching sent emails:', error);
+      return res.status(500).json({ error: 'Failed to fetch sent emails' });
+    }
+
+    // For each email, fetch open events and build analytics
+    const emailsWithAnalytics = await Promise.all(
+      emails.map(async (email) => {
+        // Fetch open events for this email
+        const { data: opens, error: opensError } = await supabase
+          .from('opens')
+          .select('*')
+          .eq('email_id', email.id)
+          .order('opened_at', { ascending: false });
+        if (opensError) {
+          console.error('[API] Error fetching opens for email', email.id, opensError);
+        }
+        // Analytics
+        const openCount = opens ? opens.length : 0;
+        const lastOpened = opens && opens.length > 0 ? opens[0].opened_at : null;
+        // Device and location stats
+        const deviceStats = {};
+        const locationStats = {};
+        (opens || []).forEach(open => {
+          const device = open.device_type || 'Unknown';
+          deviceStats[device] = (deviceStats[device] || 0) + 1;
+          const location = open.ip_address || 'Unknown';
+          locationStats[location] = (locationStats[location] || 0) + 1;
+        });
+        return {
+          id: email.id,
+          to: email.to_email,
+          subject: email.subject,
+          body: email.body,
+          date: email.sent_at || email.created_at,
+          analytics: {
+            opens: openCount,
+            lastOpened,
+            devices: Object.entries(deviceStats).map(([type, count]) => ({ type, count })),
+            locations: Object.entries(locationStats).map(([location, count]) => ({ location, count })),
+            openHistory: (opens || []).map(open => ({
+              timestamp: open.opened_at,
+              device: open.device_type,
+              browser: open.browser,
+              os: open.os,
+              location: open.ip_address
+            }))
+          }
+        };
+      })
+    );
+    res.json(emailsWithAnalytics);
+  } catch (err) {
+    console.error('[API] Unexpected error:', err);
+    res.status(500).json({ error: 'Unexpected error' });
   }
 });
 

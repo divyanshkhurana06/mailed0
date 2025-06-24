@@ -1,128 +1,181 @@
 // == Mailed Gmail Tracker Content Script ==
-// This script runs on mail.google.com, detects when an email is sent, injects a tracking pixel, and reports to backend.
+// This script runs on mail.google.com, detects when an email is sent, 
+// injects a tracking pixel, and reports to the backend.
 
 const BACKEND_URL = 'http://localhost:3000/api/extension/email-sent';
-const TRACKING_PIXEL_BASE = 'http://localhost:3000/api/open?id=';
+const TRACKING_PIXEL_BASE = 'http://localhost:3000/api/pixel?id=';
 
+// This variable will hold the email data captured just before sending.
 let lastComposeData = null;
 
-// Utility to generate a unique tracking ID
+// Utility to generate a unique ID for tracking.
 function generateTrackingId() {
-  return 'track_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  // Generate a random 9-character string by padding and slicing.
+  const randomPart = (Math.random().toString(36) + '000000000').slice(2, 11);
+  return 'track_' + Date.now() + '_' + randomPart;
 }
 
-// Observe DOM for sent emails
-function observeGmailSend() {
-  console.log('[Mailed Extension] Setting up MutationObserver for Gmail send events');
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (node.nodeType === 1) {
-          const text = node.textContent?.trim();
-          if (text && text.toLowerCase().includes('message sent')) {
-            console.log('[Mailed Extension] Detected "Message sent" node:', text);
-            // Use the data we captured on send-click
-            setTimeout(processLastSentDraft, 200);
-          }
-        }
-      }
+/**
+ * Extract email address from Gmail's data-hovercard-id attribute
+ * @param {string} hovercardId - The data-hovercard-id value
+ * @returns {string} The clean email address
+ */
+function extractEmail(hovercardId) {
+  // Gmail's data-hovercard-id is usually in the format: email@domain.com
+  // But sometimes it might have additional parameters or encoding
+  return hovercardId.split('?')[0].trim();
+}
+
+/**
+ * Captures the To, Subject, and Body from a compose window right when
+ * the user clicks the "Send" button.
+ * @param {HTMLElement} composeWindow - The root DOM element of the compose window.
+ */
+function captureComposeData(composeWindow) {
+  console.log('[Mailed Extension] Capturing compose data and injecting pixel...');
+
+  try {
+    // --- Find To recipients ---
+    const toElements = composeWindow.querySelectorAll('div[name="to"] .afV[data-hovercard-id], div[name="to"] span[email]');
+    const toAddresses = Array.from(toElements).map(el => {
+      // Try both data-hovercard-id and email attribute
+      const email = el.getAttribute('data-hovercard-id') || el.getAttribute('email');
+      return email ? extractEmail(email) : null;
+    }).filter(email => email && email.includes('@')); // Ensure valid email addresses
+
+    const to = toAddresses.join(', ');
+
+    // --- Find Subject ---
+    const subjectElement = composeWindow.querySelector('input[name="subjectbox"]');
+    const subject = subjectElement ? subjectElement.value.trim() : '';
+
+    // --- Find Body ---
+    const bodyElement = composeWindow.querySelector('div[role="textbox"][aria-label="Message Body"]');
+
+    if (!to || !subjectElement || !bodyElement) {
+      console.error('[Mailed Extension] Could not find all compose fields:', {
+        hasTo: !!to,
+        hasSubject: !!subjectElement,
+        hasBody: !!bodyElement
+      });
+      return;
     }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+
+    // Generate tracking ID and create pixel
+    const trackingId = generateTrackingId();
+    const pixelImg = `<img src="${TRACKING_PIXEL_BASE}${trackingId}" width="1" height="1" style="display:none;" alt="">`;
+    
+    // Log the current body content for debugging
+    console.log('[Mailed Extension] Current body content:', bodyElement.innerHTML);
+    
+    // CRITICAL STEP: Inject the pixel directly into the message body
+    // Only inject the hidden tracking pixel image, not the tracking ID as text
+    const pixelContainer = document.createElement('div');
+    pixelContainer.innerHTML = pixelImg; // Only the image, no text
+    bodyElement.appendChild(pixelContainer);
+
+    // Store everything we need to send to the backend
+    lastComposeData = {
+      to: to,
+      subject: subject,
+      trackingId: trackingId
+    };
+
+    console.log('[Mailed Extension] Successfully captured data:', {
+      to: to,
+      subject: subject,
+      trackingId: trackingId
+    });
+
+  } catch (error) {
+    console.error('[Mailed Extension] Error in captureComposeData:', error);
+  }
 }
 
-function observeAndCaptureSendClick() {
-  console.log('[Mailed Extension] Setting up general click listener to find Send button.');
-  document.body.addEventListener('click', (event) => {
-    let target = event.target;
-    // Traverse up the DOM to find the button element, as the click might be on an icon inside it
-    for (let i = 0; i < 5 && target; i++) {
-       const ariaLabel = target.getAttribute('aria-label');
-       const dataTooltip = target.getAttribute('data-tooltip');
-       const text = target.textContent?.trim().toLowerCase();
-
-       // Log details of the element path to help debug
-       console.log(`[Mailed Extension] Click Path [${i}]:`, {
-         tag: target.tagName,
-         ariaLabel: ariaLabel,
-         dataTooltip: dataTooltip,
-         text: text.slice(0, 50),
-       });
-
-      // Check if the element is the send button
-      if (
-        (ariaLabel && ariaLabel.toLowerCase() === 'send') ||
-        (dataTooltip && dataTooltip.toLowerCase() === 'send') ||
-        (text === 'send')
-      ) {
-        console.log('[Mailed Extension] "Send" button clicked!');
-        const composeWin = target.closest('div[role="dialog"]');
-        if (composeWin) {
-          const bodyElem = composeWin.querySelector('[aria-label="Message Body"]');
-          const toElem = composeWin.querySelector('textarea[name="to"]');
-          const subjectElem = composeWin.querySelector('input[name="subjectbox"]');
-          if (bodyElem && toElem && subjectElem) {
-            // Save the compose data globally
-            lastComposeData = {
-              body: bodyElem.innerHTML,
-              to: toElem.value,
-              subject: subjectElem.value
-            };
-            console.log('[Mailed Extension] Successfully captured compose data:', lastComposeData);
-          } else {
-            console.error('[Mailed Extension] Could not find all compose fields (to, subject, body).');
-          }
-        } else {
-            console.error('[Mailed Extension] Could not find parent compose window for Send button.');
-        }
-        return; // Stop after finding the button
-      }
-      target = target.parentElement;
-    }
-  }, true); // Use capture phase to catch the click early
-}
-
-// Find the last sent draft and inject tracking pixel
-function processLastSentDraft() {
+/**
+ * Sends the captured email data to our backend for tracking.
+ */
+function sendTrackedEmail() {
   if (!lastComposeData) {
-    console.log('[Mailed Extension] No pre-captured compose data found. Something was missed.');
+    console.log('[Mailed Extension] No compose data to send');
     return;
   }
-  let { body, to, subject } = lastComposeData;
-  lastComposeData = null; // Clear after use
 
-  let trackingId = generateTrackingId();
-  const pixelTag = `<img src="${TRACKING_PIXEL_BASE}${trackingId}" width="1" height="1" style="display:none;" alt="" />`;
+  const payload = {
+    toAddress: lastComposeData.to,
+    subject: lastComposeData.subject,
+    trackingId: lastComposeData.trackingId,
+  };
 
-  // Inject pixel into the captured body
-  body += pixelTag;
-  console.log('[Mailed Extension] Injected tracking pixel into captured body.');
-
-  // Send to backend
-  console.log('[Mailed Extension] Sending captured email data to backend:', {
-    to,
-    subject,
-    trackingId
-  });
+  console.log('[Mailed Extension] Sending to backend:', payload);
+  
   fetch(BACKEND_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, body, trackingId })
+    body: JSON.stringify(payload),
   })
-    .then(res => res.json())
-    .then(data => console.log('[Mailed Extension] Backend response:', data))
-    .catch(err => console.error('[Mailed Extension] Error sending to backend:', err));
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(err => {
+        throw new Error(`Backend error (${response.status}): ${err.error || 'Unknown error'}`);
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('[Mailed Extension] Successfully sent to backend:', data);
+  })
+  .catch(err => {
+    console.error('[Mailed Extension] Backend error:', err);
+  })
+  .finally(() => {
+    lastComposeData = null;
+  });
 }
 
-// Start observing when Gmail is ready
-function waitForGmail() {
+/**
+ * Sets up the core logic: a click listener to capture data, and a
+ * mutation observer to know when the send is confirmed.
+ */
+function initialize() {
+  console.log('[Mailed Extension] Initializing...');
+
+  // Listen for clicks on the entire document
+  document.body.addEventListener('click', (e) => {
+    const sendButton = e.target.closest('div[role="button"][data-tooltip*="Send"]');
+    if (sendButton) {
+      const composeWindow = sendButton.closest('div.nH.Hd[role="dialog"]');
+      if (composeWindow) {
+        captureComposeData(composeWindow);
+      }
+    }
+  }, { capture: true }); // Use capture phase to inject before Gmail sends
+
+  // Watch for the "Message sent" notification
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE && 
+            (node.textContent.includes('Message sent') || 
+             node.textContent.includes('Sending'))) {
+          console.log('[Mailed Extension] Send confirmation detected');
+          sendTrackedEmail();
+        }
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// Wait for Gmail UI to load
+const startupObserver = new MutationObserver(() => {
   if (document.querySelector('div[role="main"]')) {
-    console.log('[Mailed Extension] Gmail detected, starting all observers.');
-    observeGmailSend();
-    observeAndCaptureSendClick();
-  } else {
-    setTimeout(waitForGmail, 1000);
+    console.log('[Mailed Extension] Gmail UI ready, initializing extension');
+    initialize();
+    startupObserver.disconnect();
   }
-}
+});
 
-waitForGmail(); 
+startupObserver.observe(document.documentElement, { childList: true, subtree: true }); console.log("[Mailed Extension] VERSION 2 - PIXEL BASE:  + TRACKING_PIXEL_BASE + ");
+console.log("[Mailed Extension] VERSION 2 - PIXEL BASE: " + TRACKING_PIXEL_BASE);
