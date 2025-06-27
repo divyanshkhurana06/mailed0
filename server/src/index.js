@@ -555,19 +555,18 @@ app.get('/api/open', async (req, res) => {
 
     // Detect Google proxy or sender's own device
     const uaString = req.headers['user-agent'] || '';
+    console.log('User-Agent:', uaString); // Log the user-agent for debugging
     const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || req.socket.remoteAddress || req.ip || 'unknown';
     const ua = new UAParser(uaString);
     const device = ua.getDevice();
     const browser = ua.getBrowser();
     const os = ua.getOS();
 
-    // Improved device type detection
+    // Improved device type detection with broader regex
     let deviceType = device.type || '';
     if (!deviceType) {
-      if (/mobile|iphone|android|ipad|ipod|blackberry|iemobile|opera mini/i.test(uaString)) {
-        deviceType = 'mobile';
-      } else if (/tablet|ipad/i.test(uaString)) {
-        deviceType = 'tablet';
+      if (/mobile|iphone|android|ipad|ipod|blackberry|iemobile|opera mini|webos|fennec|windows phone|kindle|silk|palm|symbian|nokia|bb10|playbook|tablet/i.test(uaString)) {
+        deviceType = /tablet|ipad/i.test(uaString) ? 'tablet' : 'mobile';
       } else {
         deviceType = 'desktop';
       }
