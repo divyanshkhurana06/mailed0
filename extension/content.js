@@ -1,6 +1,6 @@
 
 const BACKEND_URL = 'http://localhost:3000/api/extension/email-sent';
-const TRACKING_PIXEL_BASE = 'https://4d33-2401-4900-1c74-c868-3829-adbc-c24d-29b0.ngrok-free.app/api/open?id=';
+const TRACKING_PIXEL_BASE = 'https://mailed0.onrender.com/api/open?id=';
 
 // This variable will hold the email data captured just before sending.
 let lastComposeData = null;

@@ -561,6 +561,18 @@ app.get('/api/open', async (req, res) => {
     const browser = ua.getBrowser();
     const os = ua.getOS();
 
+    // Improved device type detection
+    let deviceType = device.type || '';
+    if (!deviceType) {
+      if (/mobile|iphone|android|ipad|ipod|blackberry|iemobile|opera mini/i.test(uaString)) {
+        deviceType = 'mobile';
+      } else if (/tablet|ipad/i.test(uaString)) {
+        deviceType = 'tablet';
+      } else {
+        deviceType = 'desktop';
+      }
+    }
+
     // List of known Google IP patterns (partial)
     const googleIpPatterns = [
       /^66\.102\./, /^66\.249\./, /^64\.233\./, /^72\.14\./, /^203\.208\./, /^209\.85\./, /^216\.239\./, /^74\.125\./, /^173\.194\./, /^207\.126\./, /^216\.58\./, /^172\.217\./, /^108\.177\./, /^35\./, /^34\./
@@ -573,7 +585,7 @@ app.get('/api/open', async (req, res) => {
       console.log(`Direct open detected for tracking ID: ${id}`);
     }
     
-    console.log(`Open details - Device: ${device.type || 'desktop'}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
+    console.log(`Open details - Device: ${deviceType}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
 
     // Record the open, flagging if it's from a proxy
     const { data, error } = await supabase
@@ -581,7 +593,7 @@ app.get('/api/open', async (req, res) => {
       .insert({
         tracking_id: id,
         opened_at: new Date().toISOString(),
-        device_type: device.type || 'desktop',
+        device_type: deviceType,
         browser: `${browser.name} ${browser.version}`,
         os: `${os.name} ${os.version}`,
         ip_address: ip,
