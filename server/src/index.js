@@ -568,31 +568,24 @@ app.get('/api/open', async (req, res) => {
     const isGoogleProxy = googleIpPatterns.some(pattern => pattern.test(ip)) || uaString.toLowerCase().includes('googleimageproxy');
 
     if (isGoogleProxy) {
-      console.log('Ignoring open from Google proxy:', ip, uaString);
-      // Return the pixel but do not record the open
-      res.writeHead(200, {
-        'Content-Type': 'image/gif',
-        'Content-Length': '43',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      return res.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
+      console.log(`Google proxy detected. Recording as a proxy open for tracking ID: ${id}`);
+    } else {
+      console.log(`Direct open detected for tracking ID: ${id}`);
     }
-
-    console.log(`Tracking pixel accessed for tracking ID: ${id}`);
+    
     console.log(`Open details - Device: ${device.type || 'desktop'}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
 
-    // Record the open
+    // Record the open, flagging if it's from a proxy
     const { data, error } = await supabase
       .from('opens')
       .insert({
-        tracking_id: id, // This is now the tracking_id
+        tracking_id: id,
         opened_at: new Date().toISOString(),
         device_type: device.type || 'desktop',
         browser: `${browser.name} ${browser.version}`,
         os: `${os.name} ${os.version}`,
-        ip_address: ip
+        ip_address: ip,
+        is_proxy_open: isGoogleProxy // Flag the open if it's from a proxy
       })
       .select();
 
