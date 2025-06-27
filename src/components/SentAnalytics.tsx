@@ -22,7 +22,7 @@ export const SentAnalytics: React.FC<SentAnalyticsProps> = ({ searchQuery, userE
   useEffect(() => {
     const fetchSentEmails = async () => {
       try {
-        const fetchedEmails = await api.getSentEmails(userEmail);
+        const fetchedEmails = await api.getSentEmails();
         setSentEmails(fetchedEmails);
       } catch (error) {
         addNotification({
@@ -143,8 +143,11 @@ export const SentAnalytics: React.FC<SentAnalyticsProps> = ({ searchQuery, userE
             key={email.id}
             className="transform transition-all duration-500"
             style={{
+              animationName: 'slideInUp',
+              animationDuration: '0.6s',
+              animationTimingFunction: 'ease-out',
+              animationFillMode: 'forwards',
               animationDelay: `${index * 50}ms`,
-              animation: 'slideInUp 0.6s ease-out forwards',
             }}
           >
             <SentEmailCard 

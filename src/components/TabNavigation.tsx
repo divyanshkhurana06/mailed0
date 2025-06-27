@@ -11,9 +11,9 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
   onTabChange,
 }) => {
   const tabs = [
-    { id: 'inbox' as const, label: 'Inbox', icon: Inbox, count: 12 },
+    { id: 'inbox' as const, label: 'Inbox', icon: Inbox, count: 20 },
     { id: 'sent' as const, label: 'Sent', icon: Send, count: 8 },
-    { id: 'folders' as const, label: 'Folders', icon: FolderOpen, count: 5 },
+    { id: 'folders' as const, label: 'Folders', icon: FolderOpen, count: 6 },
   ];
 
   return (

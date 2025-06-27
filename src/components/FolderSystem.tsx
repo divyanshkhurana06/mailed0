@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
-import { Folder, Filter, Zap, TrendingUp, Users, ShoppingBag, Calendar, Briefcase } from 'lucide-react';
+import { Folder, Filter, Zap, TrendingUp, Users, ShoppingBag, Calendar, Briefcase, Send } from 'lucide-react';
 import { EmailCategory } from '../types/email';
 
 interface FolderSystemProps {
-  onCategorySelect: (category: EmailCategory | 'all') => void;
+  onCategorySelect: (category: EmailCategory | 'all' | 'sent') => void;
   selectedCategory: EmailCategory | 'all';
+  sentCount: number;
 }
 
 export const FolderSystem: React.FC<FolderSystemProps> = ({
   onCategorySelect,
   selectedCategory,
+  sentCount,
 }) => {
   const [hoveredFolder, setHoveredFolder] = useState<string | null>(null);
 
   const folders = [
+    {
+      id: 'sent',
+      name: 'Sent',
+      icon: Send,
+      count: sentCount,
+      color: 'from-blue-500 to-purple-500',
+      description: 'All sent emails',
+    },
     {
       id: 'work',
       name: 'Work & Business',
@@ -122,6 +132,13 @@ export const FolderSystem: React.FC<FolderSystemProps> = ({
           const Icon = folder.icon;
           const isSelected = selectedCategory === folder.id;
           const isHovered = hoveredFolder === folder.id;
+          const handleClick = () => {
+            if (folder.id === 'sent') {
+              onCategorySelect('sent');
+            } else {
+              onCategorySelect(folder.id as EmailCategory);
+            }
+          };
           
           return (
             <div
@@ -134,7 +151,7 @@ export const FolderSystem: React.FC<FolderSystemProps> = ({
                 animationDelay: `${index * 100}ms`,
                 animation: 'slideInUp 0.6s ease-out forwards',
               }}
-              onClick={() => onCategorySelect(folder.id as EmailCategory)}
+              onClick={handleClick}
               onMouseEnter={() => setHoveredFolder(folder.id)}
               onMouseLeave={() => setHoveredFolder(null)}
             >

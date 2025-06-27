@@ -4,7 +4,8 @@ import { EmailList } from './EmailList';
 import { SentAnalytics } from './SentAnalytics';
 import { FolderSystem } from './FolderSystem';
 import { SearchBar } from './SearchBar';
-import { EmailCategory } from '../types/email';
+import { EmailCategory, SentEmail } from '../types/email';
+import { api } from '../utils/api';
 
 interface DashboardProps {
   userEmail: string;
@@ -14,6 +15,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'folders'>('inbox');
   const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sentCount, setSentCount] = useState(0);
+
+  const handleCategorySelect = (category: EmailCategory | 'all' | 'sent') => {
+    if (category === 'sent') {
+      setActiveTab('sent');
+    } else {
+      setSelectedCategory(category);
+    }
+  };
+
+  useEffect(() => {
+    const fetchSentEmails = async () => {
+      try {
+        const sentEmails: SentEmail[] = await api.getSentEmails();
+        setSentCount(sentEmails.length);
+      } catch (e) {
+        setSentCount(0);
+      }
+    };
+    fetchSentEmails();
+  }, [userEmail]);
 
   return (
     <div className="min-h-screen p-6">
@@ -61,8 +83,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
           
           {activeTab === 'folders' && (
             <FolderSystem 
-              onCategorySelect={setSelectedCategory}
+              onCategorySelect={handleCategorySelect}
               selectedCategory={selectedCategory}
+              sentCount={sentCount}
             />
           )}
         </main>

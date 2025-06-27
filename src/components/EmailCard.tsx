@@ -25,10 +25,11 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick, onEmailCli
     createConfetti(e.currentTarget as HTMLElement);
     
     // Add read tracking animation
-    if (!email.isRead) {
-      e.currentTarget.classList.add('animate-pulse');
+    if (!email.isRead && e.currentTarget instanceof HTMLElement) {
+      const el = e.currentTarget as HTMLElement;
+      el.classList.add('animate-pulse');
       setTimeout(() => {
-        e.currentTarget.classList.remove('animate-pulse');
+        el.classList.remove('animate-pulse');
       }, 500);
     }
   };
@@ -40,7 +41,9 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick, onEmailCli
       events: 'from-purple-500 to-pink-500',
       marketing: 'from-orange-500 to-red-500',
       personal: 'from-indigo-500 to-purple-500',
-    };
+      account: 'from-yellow-500 to-yellow-700',
+      general: 'from-gray-500 to-gray-600',
+    } as const;
     return colors[category] || 'from-gray-500 to-gray-600';
   };
 

@@ -571,6 +571,10 @@ app.get('/api/open', async (req, res) => {
         deviceType = 'desktop';
       }
     }
+    // Force deviceType to be only 'mobile', 'tablet', or 'desktop'
+    if (deviceType !== 'mobile' && deviceType !== 'tablet') {
+      deviceType = 'desktop';
+    }
 
     // List of known Google IP patterns (partial)
     const googleIpPatterns = [
