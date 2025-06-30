@@ -1,0 +1,5 @@
+# Redirects for Single Page Application
+/*    /index.html   200
+
+# API redirects (if needed)
+/api/*  https://your-backend-name.onrender.com/api/:splat  200 

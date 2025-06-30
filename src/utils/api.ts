@@ -1,6 +1,8 @@
 import { Email, SentEmail } from '../types/email';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// Use environment variable in production, fallback to localhost in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD ? 'https://your-backend-domain.onrender.com/api' : 'http://localhost:3000/api');
 
 export const api = {
   // Google OAuth

@@ -17,7 +17,17 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://your-app-name.netlify.app', // Production frontend
+    'http://localhost:5173',              // Development frontend
+    'http://localhost:3000',              // Development backend
+    'https://mail.google.com'             // Gmail for extension
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email']
+}));
 app.use(express.json());
 
 // Initialize clients
@@ -582,70 +592,34 @@ app.get('/api/open', async (req, res) => {
     ];
     const isGoogleProxy = googleIpPatterns.some(pattern => pattern.test(ip)) || uaString.toLowerCase().includes('googleimageproxy');
 
-    // Check if this is the first open for this tracking ID
-    const { data: existingOpens, error: checkError } = await supabase
-      .from('opens')
-      .select('id, opened_at')
-      .eq('tracking_id', id)
-      .order('opened_at', { ascending: true });
-
-    if (checkError) {
-      console.error('Error checking existing opens:', checkError);
-    }
-
-    const isFirstOpen = !existingOpens || existingOpens.length === 0;
-
-    if (isFirstOpen) {
-      console.log(`First automatic open detected for tracking ID: ${id} (ignoring this open)`);
-      // Record this open but mark it as ignored/automatic
-      const { error: insertError } = await supabase
-        .from('opens')
-        .insert({
-          tracking_id: id,
-          opened_at: new Date().toISOString(),
-          device_type: deviceType,
-          browser: `${browser.name} ${browser.version}`,
-          os: `${os.name} ${os.version}`,
-          ip_address: ip,
-          is_proxy_open: isGoogleProxy,
-          is_ignored: true, // Mark this as the ignored first open
-          notes: 'First automatic open (ignored)'
-        });
-
-      if (insertError) {
-        console.error('Error recording ignored first open:', insertError);
-      }
+    if (isGoogleProxy) {
+      console.log(`Google proxy detected. Recording open for tracking ID: ${id}`);
     } else {
-      if (isGoogleProxy) {
-        console.log(`Google proxy detected. Recording as a proxy open for tracking ID: ${id}`);
-      } else {
-        console.log(`Direct open detected for tracking ID: ${id}`);
-      }
-      
-      console.log(`Open details - Device: ${deviceType}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
-
-      // Record the open as a real user open
-      const { data, error } = await supabase
-        .from('opens')
-        .insert({
-          tracking_id: id,
-          opened_at: new Date().toISOString(),
-          device_type: deviceType,
-          browser: `${browser.name} ${browser.version}`,
-          os: `${os.name} ${os.version}`,
-          ip_address: ip,
-          is_proxy_open: isGoogleProxy,
-          is_ignored: false // This is a real open
-        })
-        .select();
-
-      if (error) {
-        console.error('Supabase error recording open:', error);
-        throw error;
-      }
-
-      console.log(`Successfully recorded real open for tracking ID ${id}:`, data);
+      console.log(`Direct open detected for tracking ID: ${id}`);
     }
+    
+    console.log(`Open details - Device: ${deviceType}, Browser: ${browser.name}, OS: ${os.name}, IP: ${ip}`);
+
+    // Record the open (all opens are logged, first-open filtering happens in analytics)
+    const { data, error } = await supabase
+      .from('opens')
+      .insert({
+        tracking_id: id,
+        opened_at: new Date().toISOString(),
+        device_type: deviceType,
+        browser: `${browser.name} ${browser.version}`,
+        os: `${os.name} ${os.version}`,
+        ip_address: ip,
+        is_proxy_open: isGoogleProxy
+      })
+      .select();
+
+    if (error) {
+      console.error('Supabase error recording open:', error);
+      throw error;
+    }
+
+    console.log(`Successfully recorded open for tracking ID ${id}:`, data);
 
     // Return a 1x1 transparent pixel
     res.writeHead(200, {
@@ -696,36 +670,40 @@ app.get('/api/emails/sent', async (req, res) => {
 
     for (const sentEmail of sentEmails || []) {
       try {
-        // Get tracking analytics from Supabase (only count real opens, not ignored ones)
-        const { data: opens, error: opensError } = await supabase
+        // Get tracking analytics from Supabase (all opens, we'll ignore just the first one)
+        const { data: allOpens, error: opensError } = await supabase
           .from('opens')
           .select('*')
           .eq('tracking_id', sentEmail.tracking_id)
-          .eq('is_ignored', false) // Only count real opens, not the first ignored one
-          .order('opened_at', { ascending: false });
+          .order('opened_at', { ascending: true }); // Order by earliest first
 
         if (opensError) {
           console.error('Error fetching opens:', opensError);
         }
 
-        const openCount = opens?.length || 0;
-        const lastOpened = opens?.[0]?.opened_at || null;
+        // Remove the very first open (chronologically), count all the rest
+        const validOpens = allOpens && allOpens.length > 0 ? allOpens.slice(1) : [];
+        
+        if (allOpens && allOpens.length > 0) {
+          console.log(`Ignoring first open (${allOpens[0].opened_at}) for tracking ID: ${sentEmail.tracking_id}`);
+        }
 
-        // Get device analytics (only from real opens)
+        const openCount = validOpens.length;
+        const lastOpened = validOpens[validOpens.length - 1]?.opened_at || null;
+
+        // Get device analytics (only from valid opens)
         const deviceStats = {};
         const locationStats = {};
         
-        if (opens) {
-          opens.forEach(open => {
-            // Device stats
-            const deviceType = open.device_type || 'unknown';
-            deviceStats[deviceType] = (deviceStats[deviceType] || 0) + 1;
-            
-            // Location stats
-            const location = open.ip_address || 'unknown';
-            locationStats[location] = (locationStats[location] || 0) + 1;
-          });
-        }
+        validOpens.forEach(open => {
+          // Device stats
+          const deviceType = open.device_type || 'unknown';
+          deviceStats[deviceType] = (deviceStats[deviceType] || 0) + 1;
+          
+          // Location stats
+          const location = open.ip_address || 'unknown';
+          locationStats[location] = (locationStats[location] || 0) + 1;
+        });
 
         // Simple categorization
         const tags = categorizeEmail(sentEmail.subject, sentEmail.to_email, sentEmail.body);
@@ -746,13 +724,13 @@ app.get('/api/emails/sent', async (req, res) => {
             lastOpened,
             devices: Object.entries(deviceStats).map(([type, count]) => ({ type, count })),
             locations: Object.entries(locationStats).map(([location, count]) => ({ location, count })),
-            openHistory: opens?.map(open => ({
+            openHistory: validOpens.map(open => ({
               timestamp: open.opened_at,
               device: open.device_type,
               browser: open.browser,
               os: open.os,
               location: open.ip_address
-            })) || []
+            }))
           }
         };
 
@@ -959,27 +937,44 @@ app.get('/api/sent-emails', async (req, res) => {
     // For each email, fetch open events and build analytics
     const emailsWithAnalytics = await Promise.all(
       emails.map(async (email) => {
-        // Fetch open events for this email
-        const { data: opens, error: opensError } = await supabase
+        // Fetch open events for this email (all opens, ordered chronologically)
+        const { data: allOpens, error: opensError } = await supabase
           .from('opens')
           .select('*')
           .eq('tracking_id', email.tracking_id)
-          .order('opened_at', { ascending: false });
+          .order('opened_at', { ascending: true }); // Order by earliest first
+
         if (opensError) {
-          console.error('[API] Error fetching opens for email', email.id, opensError);
+          console.error('Error fetching opens:', opensError);
         }
-        // Analytics
-        const openCount = opens ? opens.length : 0;
-        const lastOpened = opens && opens.length > 0 ? opens[0].opened_at : null;
-        // Device and location stats
+
+        // Remove the very first open (chronologically), count all the rest
+        const validOpens = allOpens && allOpens.length > 0 ? allOpens.slice(1) : [];
+        
+        if (allOpens && allOpens.length > 0) {
+          console.log(`Ignoring first open (${allOpens[0].opened_at}) for tracking ID: ${email.tracking_id}`);
+        }
+
+        const openCount = validOpens.length;
+        const lastOpened = validOpens[validOpens.length - 1]?.opened_at || null;
+
+        // Get device analytics (only from valid opens)
         const deviceStats = {};
         const locationStats = {};
-        (opens || []).forEach(open => {
-          const device = open.device_type || 'Unknown';
-          deviceStats[device] = (deviceStats[device] || 0) + 1;
-          const location = open.ip_address || 'Unknown';
+        
+        validOpens.forEach(open => {
+          // Device stats
+          const deviceType = open.device_type || 'unknown';
+          deviceStats[deviceType] = (deviceStats[deviceType] || 0) + 1;
+          
+          // Location stats
+          const location = open.ip_address || 'unknown';
           locationStats[location] = (locationStats[location] || 0) + 1;
         });
+
+        // Simple categorization
+        const tags = categorizeEmail(email.subject, email.to_email, email.body);
+
         return {
           id: email.id,
           to: email.to_email,
@@ -991,7 +986,7 @@ app.get('/api/sent-emails', async (req, res) => {
             lastOpened,
             devices: Object.entries(deviceStats).map(([type, count]) => ({ type, count })),
             locations: Object.entries(locationStats).map(([location, count]) => ({ location, count })),
-            openHistory: (opens || []).map(open => ({
+            openHistory: validOpens.map(open => ({
               timestamp: open.opened_at,
               device: open.device_type,
               browser: open.browser,

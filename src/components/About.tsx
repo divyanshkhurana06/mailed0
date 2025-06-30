@@ -88,8 +88,112 @@ export const About: React.FC<AboutProps> = ({ onBack }) => {
           </button>
         </div>
 
-        {/* Hero Section */}
+        {/* Project Description - Now First */}
         <div className={`transition-all duration-1000 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 mb-16">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-white mb-4">About Mailed</h2>
+              <p className="text-white/60 text-lg max-w-3xl mx-auto">
+                A cutting-edge email tracking and management solution that leverages AI to provide intelligent 
+                email categorization, real-time tracking analytics, and seamless Gmail integration.
+              </p>
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {features.map((feature, index) => (
+                <div
+                  key={index}
+                  className={`group p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-white/20 transition-all duration-300 hover:transform hover:scale-105 ${
+                    activeFeature === index ? 'border-purple-500/50 bg-purple-500/10' : ''
+                  }`}
+                  onMouseEnter={() => setActiveFeature(index)}
+                >
+                  <div className={`w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 ${
+                    activeFeature === index ? 'animate-pulse' : ''
+                  }`}>
+                    <div className="text-white">
+                      {feature.icon}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-white/60 text-sm leading-relaxed">{feature.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Built with Bolt.new Section - Now Second */}
+        <div className={`transition-all duration-1000 delay-400 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="mb-20 relative">
+            <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 backdrop-blur-xl rounded-3xl p-8 border border-yellow-500/20 relative overflow-hidden">
+              {/* Animated background effects */}
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-orange-500/5 to-red-500/5 animate-pulse"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 animate-shimmer"></div>
+              
+              {/* Content */}
+              <div className="relative z-10 text-center">
+                <div className="flex items-center justify-center mb-6">
+                  {/* Animated Bolt Icon */}
+                  <div className="relative">
+                    <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 rounded-2xl flex items-center justify-center animate-bounce shadow-2xl shadow-yellow-500/50">
+                      <Zap className="w-8 h-8 text-white animate-pulse" />
+                    </div>
+                    {/* Lightning effect */}
+                    <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400/50 via-orange-400/50 to-red-400/50 rounded-3xl blur-xl animate-pulse"></div>
+                    <div className="absolute -inset-4 bg-gradient-to-r from-yellow-400/30 via-orange-400/30 to-red-400/30 rounded-full blur-2xl animate-ping"></div>
+                  </div>
+                </div>
+                
+                <h2 className="text-3xl font-bold text-transparent bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 bg-clip-text mb-4">
+                  ⚡ Built by Divyansh with Bolt.new ⚡
+                </h2>
+                
+                <p className="text-lg text-white/80 mb-4 max-w-2xl mx-auto">
+                  <span className="font-bold text-transparent bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text">I</span> rapidly prototyped and developed this entire 
+                  full-stack application using <span className="font-bold text-transparent bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text">Bolt.new</span> - 
+                  showcasing how modern AI development tools can accelerate complex project creation.
+                </p>
+
+                <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-sm rounded-2xl p-4 mb-6 border border-purple-400/20">
+                  <p className="text-white/90 text-sm">
+                    <span className="font-semibold text-purple-300">"As a VIT student passionate about AI and full-stack development, 
+                    I leveraged Bolt.new to rapidly build Mailed - demonstrating how AI-powered tools can help developers 
+                    create sophisticated applications with advanced features like email tracking, real-time analytics, and intelligent categorization."</span>
+                  </p>
+                  <p className="text-purple-300 text-xs mt-2 font-medium">- Divyansh Khurana, Developer</p>
+                </div>
+                
+                <div className="flex flex-wrap justify-center gap-4 mb-6">
+                  {[
+                    "🚀 Rapid Prototyping",
+                    "🤖 AI-Powered Development", 
+                    "⚡ Full-Stack in Hours",
+                    "🎯 Modern Tech Integration"
+                  ].map((feature, index) => (
+                    <div key={index} className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-sm px-4 py-2 rounded-full border border-yellow-400/30">
+                      <span className="text-yellow-100 font-medium">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="text-sm text-white/60">
+                  <span className="font-semibold text-yellow-400">For Judges:</span> This project demonstrates the synergy between human creativity 
+                  and AI-powered development tools, resulting in a production-ready application with enterprise-level features.
+                </div>
+              </div>
+              
+              {/* Floating elements */}
+              <div className="absolute top-4 right-4 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>
+              <div className="absolute bottom-4 left-4 w-2 h-2 bg-orange-400 rounded-full animate-ping delay-1000"></div>
+              <div className="absolute top-1/2 right-8 w-1 h-1 bg-red-400 rounded-full animate-ping delay-500"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Hero Section - Now Third (Personal Info) */}
+        <div className={`transition-all duration-1000 delay-600 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div className="grid lg:grid-cols-2 gap-12 items-center mb-20">
             {/* Profile Section */}
             <div className="text-center lg:text-left">
@@ -205,42 +309,6 @@ export const About: React.FC<AboutProps> = ({ onBack }) => {
                   )
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Project Description */}
-        <div className={`transition-all duration-1000 delay-400 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-8 mb-16">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-white mb-4">About Mailed</h2>
-              <p className="text-white/60 text-lg max-w-3xl mx-auto">
-                A cutting-edge email tracking and management solution that leverages AI to provide intelligent 
-                email categorization, real-time tracking analytics, and seamless Gmail integration.
-              </p>
-            </div>
-
-            {/* Features Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className={`group p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-white/20 transition-all duration-300 hover:transform hover:scale-105 ${
-                    activeFeature === index ? 'border-purple-500/50 bg-purple-500/10' : ''
-                  }`}
-                  onMouseEnter={() => setActiveFeature(index)}
-                >
-                  <div className={`w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 ${
-                    activeFeature === index ? 'animate-pulse' : ''
-                  }`}>
-                    <div className="text-white">
-                      {feature.icon}
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-white/60 text-sm leading-relaxed">{feature.description}</p>
-                </div>
-              ))}
             </div>
           </div>
         </div>
