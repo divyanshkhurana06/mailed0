@@ -1018,4 +1018,39 @@ app.get('/api/sent-emails', async (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+
+// Temporary endpoint to fix user emails (REMOVE AFTER FIXING)
+app.post('/api/fix-user-emails', async (req, res) => {
+  try {
+    const { targetEmail } = req.body;
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'Target email is required' });
+    }
+
+    console.log(`[FIX] Updating unknown emails to: ${targetEmail}`);
+
+    // Update all emails with user_email = 'unknown' to the target email
+    const { data, error } = await supabase
+      .from('sent_emails')
+      .update({ user_email: targetEmail })
+      .eq('user_email', 'unknown')
+      .select();
+
+    if (error) {
+      console.error('[FIX] Error updating emails:', error);
+      return res.status(500).json({ error: 'Failed to update emails' });
+    }
+
+    console.log(`[FIX] Successfully updated ${data?.length || 0} emails`);
+    res.json({ 
+      success: true, 
+      updatedCount: data?.length || 0,
+      message: `Updated ${data?.length || 0} emails from 'unknown' to '${targetEmail}'`
+    });
+
+  } catch (error) {
+    console.error('[FIX] Unexpected error:', error);
+    res.status(500).json({ error: 'Unexpected error' });
+  }
 }); 
