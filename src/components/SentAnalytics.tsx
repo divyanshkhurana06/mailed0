@@ -22,7 +22,7 @@ export const SentAnalytics: React.FC<SentAnalyticsProps> = ({ searchQuery, userE
   useEffect(() => {
     const fetchSentEmails = async () => {
       try {
-        const fetchedEmails = await api.getSentEmails();
+        const fetchedEmails = await api.getSentEmails(userEmail);
         setSentEmails(fetchedEmails);
       } catch (error) {
         addNotification({

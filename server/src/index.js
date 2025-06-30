@@ -924,15 +924,26 @@ app.get('/api/pixel', (req, res) => {
 // --- API: Get all sent emails with analytics ---
 app.get('/api/sent-emails', async (req, res) => {
   try {
-    // Fetch all sent emails
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ error: 'Email parameter is required' });
+    }
+
+    console.log(`[API] Fetching sent emails for user: ${email}`);
+
+    // Fetch sent emails for this specific user only
     const { data: emails, error } = await supabase
       .from('sent_emails')
       .select('*')
+      .eq('user_email', email)  // Filter by user email
       .order('sent_at', { ascending: false });
+      
     if (error) {
       console.error('[API] Error fetching sent emails:', error);
       return res.status(500).json({ error: 'Failed to fetch sent emails' });
     }
+
+    console.log(`[API] Found ${emails?.length || 0} sent emails for user: ${email}`);
 
     // For each email, fetch open events and build analytics
     const emailsWithAnalytics = await Promise.all(

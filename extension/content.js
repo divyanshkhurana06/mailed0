@@ -88,6 +88,59 @@ function captureComposeData(composeWindow) {
 }
 
 /**
+ * Get the current Gmail user's email address
+ * @returns {string} The user's email address
+ */
+function getCurrentUserEmail() {
+  try {
+    // Try to find the user email from Gmail's UI
+    const userInfoElements = document.querySelectorAll('[email], [data-email]');
+    for (const element of userInfoElements) {
+      const email = element.getAttribute('email') || element.getAttribute('data-email');
+      if (email && email.includes('@')) {
+        return email;
+      }
+    }
+
+    // Try to get from account picker
+    const accountPicker = document.querySelector('[data-identifier]');
+    if (accountPicker) {
+      const email = accountPicker.getAttribute('data-identifier');
+      if (email && email.includes('@')) {
+        return email;
+      }
+    }
+
+    // Try to get from profile area
+    const profileElements = document.querySelectorAll('div[jsname] span[email]');
+    for (const element of profileElements) {
+      const email = element.getAttribute('email');
+      if (email && email.includes('@')) {
+        return email;
+      }
+    }
+
+    // Try alternative methods - sometimes Gmail stores email in different places
+    const settingsElements = document.querySelectorAll('[title*="@"], [aria-label*="@"]');
+    for (const element of settingsElements) {
+      const text = element.getAttribute('title') || element.getAttribute('aria-label');
+      if (text && text.includes('@')) {
+        const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          return emailMatch[1];
+        }
+      }
+    }
+
+    console.warn('[Mailed Extension] Could not find user email, using unknown');
+    return 'unknown';
+  } catch (error) {
+    console.error('[Mailed Extension] Error getting user email:', error);
+    return 'unknown';
+  }
+}
+
+/**
  * Sends the captured email data to our backend for tracking.
  */
 function sendTrackedEmail() {
@@ -96,11 +149,13 @@ function sendTrackedEmail() {
     return;
   }
 
+  const userEmail = getCurrentUserEmail();
   const payload = {
     toAddress: lastComposeData.to,
     subject: lastComposeData.subject,
     trackingId: lastComposeData.trackingId,
-    body: lastComposeData.body
+    body: lastComposeData.body,
+    userEmail: userEmail  // Include the sender's email
   };
 
   console.log('[Mailed Extension] Sending to backend:', payload);

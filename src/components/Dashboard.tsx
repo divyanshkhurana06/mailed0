@@ -37,7 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail, onShowAbout, on
   useEffect(() => {
     const fetchSentEmails = async () => {
       try {
-        const sentEmails: SentEmail[] = await api.getSentEmails();
+        const sentEmails: SentEmail[] = await api.getSentEmails(userEmail);
         setSentCount(sentEmails.length);
       } catch (e) {
         setSentCount(0);

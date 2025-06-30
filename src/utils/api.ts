@@ -32,8 +32,8 @@ export const api = {
   },
 
   // Sent emails with analytics
-  getSentEmails: async (): Promise<SentEmail[]> => {
-    const response = await fetch(`${API_BASE_URL}/sent-emails`);
+  getSentEmails: async (userEmail: string): Promise<SentEmail[]> => {
+    const response = await fetch(`${API_BASE_URL}/sent-emails?email=${encodeURIComponent(userEmail)}`);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.details || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
