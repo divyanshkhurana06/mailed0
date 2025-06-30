@@ -137,13 +137,54 @@ function App() {
             />
           )
         ) : (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">📧</span>
+          <div className="flex items-center justify-center min-h-screen px-6">
+            <div className="max-w-4xl w-full">
+              {/* Main Landing */}
+              <div className="text-center mb-12">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">📧</span>
+                </div>
+                <h1 className="text-4xl font-bold text-white mb-4">Welcome to Mailed</h1>
+                <p className="text-white/60 text-lg mb-8">AI-powered email tracking and analytics</p>
+                
+                {/* Extension Download Section */}
+                <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/20 mb-8">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <h3 className="text-lg font-semibold text-white">Gmail Extension</h3>
+                        <p className="text-white/60 text-sm">Auto-inject tracking pixels into your Gmail messages</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = '/mailed-extension.zip';
+                          link.download = 'mailed-extension.zip';
+                          link.click();
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl font-medium hover:scale-105 transition-all duration-200 shadow-lg"
+                      >
+                        Download Extension
+                      </button>
+                      <button
+                        onClick={() => window.open('/extension-guide.html', '_blank')}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all duration-200 text-sm"
+                      >
+                        Install Guide
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-white/60">Please sign in to continue</p>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-2">Welcome to Mailed</h1>
-              <p className="text-white/60">Please sign in to continue</p>
             </div>
           </div>
         )}

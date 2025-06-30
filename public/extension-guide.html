@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mailed Extension - Installation Guide</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e293b 0%, #3730a3 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 { color: #60a5fa; margin-bottom: 30px; }
+        h2 { color: #a78bfa; margin-top: 30px; }
+        .step {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #60a5fa;
+        }
+        .highlight {
+            background: rgba(96, 165, 250, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .warning {
+            background: rgba(251, 191, 36, 0.2);
+            border: 1px solid rgba(251, 191, 36, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Mailed Chrome Extension</h1>
+        <p>Auto-inject tracking pixels into your Gmail messages for real-time email analytics.</p>
+
+        <h2>📥 Installation Steps</h2>
+
+        <div class="step">
+            <strong>Step 1:</strong> Download the extension ZIP file from the Mailed dashboard
+        </div>
+
+        <div class="step">
+            <strong>Step 2:</strong> Extract the ZIP file to a folder on your computer
+        </div>
+
+        <div class="step">
+            <strong>Step 3:</strong> Open Chrome and go to <span class="highlight">chrome://extensions/</span>
+        </div>
+
+        <div class="step">
+            <strong>Step 4:</strong> Enable <span class="highlight">"Developer mode"</span> (toggle in top-right)
+        </div>
+
+        <div class="step">
+            <strong>Step 5:</strong> Click <span class="highlight">"Load unpacked"</span> and select the extracted folder
+        </div>
+
+        <div class="step">
+            <strong>Step 6:</strong> The extension should now appear in your extensions list
+        </div>
+
+        <div class="step">
+            <strong>Step 7:</strong> Go to Gmail and compose a new email - tracking pixels will be automatically injected!
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Note:</strong> This extension only works with Gmail in the browser. Make sure you're signed into your Mailed account to see tracking analytics.
+        </div>
+
+        <h2>🔧 How It Works</h2>
+        <ul>
+            <li>Automatically detects when you send emails in Gmail</li>
+            <li>Injects invisible 1x1 tracking pixels</li>
+            <li>Reports analytics back to your Mailed dashboard</li>
+            <li>Shows open rates, device types, and location data</li>
+        </ul>
+
+        <h2>🆘 Need Help?</h2>
+        <p>If you encounter any issues, make sure:</p>
+        <ul>
+            <li>Developer mode is enabled in Chrome</li>
+            <li>You're using Gmail in the browser (not the app)</li>
+            <li>The extension is enabled in chrome://extensions/</li>
+        </ul>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="window.close()" style="background: linear-gradient(45deg, #8b5cf6, #3b82f6); color: white; border: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; cursor: pointer;">
+                Close Guide
+            </button>
+        </div>
+    </div>
+</body>
+</html> 

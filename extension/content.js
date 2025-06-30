@@ -1,5 +1,4 @@
-
-const BACKEND_URL = 'http://localhost:3000/api/extension/email-sent';
+const BACKEND_URL = 'https://mailed0.onrender.com/api/extension/email-sent';
 const TRACKING_PIXEL_BASE = 'https://mailed0.onrender.com/api/open?id=';
 
 // This variable will hold the email data captured just before sending.
