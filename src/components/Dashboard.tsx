@@ -6,12 +6,15 @@ import { FolderSystem } from './FolderSystem';
 import { SearchBar } from './SearchBar';
 import { EmailCategory, SentEmail } from '../types/email';
 import { api } from '../utils/api';
+import { Info, LogOut } from 'lucide-react';
 
 interface DashboardProps {
   userEmail: string;
+  onShowAbout: () => void;
+  onSignOut: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ userEmail, onShowAbout, onSignOut }) => {
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'folders'>('inbox');
   const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,6 +25,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
       setActiveTab('sent');
     } else {
       setSelectedCategory(category);
+    }
+  };
+
+  const handleSignOut = () => {
+    if (window.confirm('Are you sure you want to sign out?')) {
+      onSignOut();
     }
   };
 
@@ -59,7 +68,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail }) => {
               </div>
             </div>
             
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <div className="flex items-center gap-3">
+              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+              
+              {/* About Button */}
+              <button
+                onClick={onShowAbout}
+                className="group flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white/80 hover:text-white hover:bg-white/15 hover:border-white/30 transition-all duration-300"
+                title="About"
+              >
+                <Info className="w-4 h-4" />
+                <span className="hidden sm:inline">About</span>
+              </button>
+              
+              {/* Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                className="group flex items-center gap-2 px-4 py-2 bg-red-500/10 backdrop-blur-xl border border-red-500/20 rounded-xl text-red-300 hover:text-red-200 hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-300"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
+            </div>
           </div>
           
           <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />

@@ -35,6 +35,9 @@ CREATE TABLE opens (
   browser TEXT,
   os TEXT,
   ip_address TEXT,
+  is_proxy_open BOOLEAN DEFAULT FALSE,
+  is_ignored BOOLEAN DEFAULT FALSE,
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -54,6 +57,8 @@ CREATE TABLE IF NOT EXISTS sent_emails (
 -- Create indexes
 CREATE INDEX idx_emails_user_id ON emails(user_id);
 CREATE INDEX idx_opens_tracking_id ON opens(tracking_id);
+CREATE INDEX idx_opens_is_ignored ON opens(is_ignored);
+CREATE INDEX idx_opens_is_proxy ON opens(is_proxy_open);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_user_email ON sent_emails(user_email);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_tracking_id ON sent_emails(tracking_id);
 CREATE INDEX IF NOT EXISTS idx_sent_emails_sent_at ON sent_emails(sent_at);

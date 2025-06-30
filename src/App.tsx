@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
+import { About } from './components/About';
 import { NotificationProvider } from './components/NotificationProvider';
 import { LoadingScreen } from './components/LoadingScreen';
 import { SignInModal } from './components/SignInModal';
@@ -12,6 +13,7 @@ function App() {
   const [userEmail, setUserEmail] = useState('');
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [showAbout, setShowAbout] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -108,6 +110,15 @@ function App() {
     localStorage.setItem('userEmail', email);
   };
 
+  const handleSignOut = () => {
+    setUserEmail('');
+    setIsAuthenticated(false);
+    setShowAbout(false);
+    setAuthError('');
+    localStorage.removeItem('userEmail');
+    setShowSignInModal(true);
+  };
+
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -116,7 +127,15 @@ function App() {
     <NotificationProvider>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
         {isAuthenticated ? (
-          <Dashboard userEmail={userEmail} />
+          showAbout ? (
+            <About onBack={() => setShowAbout(false)} />
+          ) : (
+            <Dashboard 
+              userEmail={userEmail} 
+              onShowAbout={() => setShowAbout(true)}
+              onSignOut={handleSignOut}
+            />
+          )
         ) : (
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">

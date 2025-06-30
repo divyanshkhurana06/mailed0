@@ -10,6 +10,60 @@
     overflow: hidden;
   }
   
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .email-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+  
+  .email-content p {
+    margin-bottom: 1rem;
+  }
+  
+  .email-content p:last-child {
+    margin-bottom: 0;
+  }
+  
+  .email-content a {
+    color: #60a5fa;
+    text-decoration: underline;
+    transition: color 0.2s ease;
+  }
+  
+  .email-content a:hover {
+    color: #93c5fd;
+  }
+  
+  .email-content h1,
+  .email-content h2,
+  .email-content h3,
+  .email-content h4,
+  .email-content h5,
+  .email-content h6 {
+    font-weight: 600;
+    margin: 1rem 0 0.5rem 0;
+    color: #f1f5f9;
+  }
+  
+  .email-content ul,
+  .email-content ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+  
+  .email-content li {
+    margin-bottom: 0.25rem;
+  }
+  
   .animate-glow {
     animation: glow 2s ease-in-out infinite alternate;
   }
@@ -72,6 +126,32 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-slow-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+.animate-spin-slow-reverse {
+  animation: spin-slow-reverse 15s linear infinite;
 }
 
 /* Custom scrollbar */

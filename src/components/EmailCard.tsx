@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Star, Paperclip, Clock, Eye } from 'lucide-react';
 import { Email, EmailCategory } from '../types/email';
-import { createConfetti } from '../utils/confetti';
 
 interface EmailCardProps {
   email: Email;
@@ -20,9 +19,6 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick, onEmailCli
     
     // Mark as read
     onClick();
-    
-    // Create confetti effect
-    createConfetti(e.currentTarget as HTMLElement);
     
     // Add read tracking animation
     if (!email.isRead && e.currentTarget instanceof HTMLElement) {
@@ -124,7 +120,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick, onEmailCli
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className={`
-              font-bold text-lg transition-colors duration-300
+              font-bold text-lg transition-colors duration-300 break-words
               ${!email.isRead ? 'text-white' : 'text-white/80'}
             `}>
               {email.from} – {email.title}
@@ -135,7 +131,7 @@ export const EmailCard: React.FC<EmailCardProps> = ({ email, onClick, onEmailCli
             </button>
           </div>
           
-          <p className="text-white/60 line-clamp-2 leading-relaxed">
+          <p className="text-white/60 line-clamp-3 leading-relaxed break-words text-sm">
             {email.preview}
           </p>
         </div>

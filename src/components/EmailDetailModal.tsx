@@ -37,24 +37,145 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({ email, isOpe
     });
   };
 
-  // Function to extract text content from HTML
-  const extractTextFromHTML = (html: string): string => {
+  // Function to extract and format text content from HTML
+  const extractAndFormatHTML = (html: string): string => {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
-    return tempDiv.textContent || tempDiv.innerText || '';
+    
+    // First, handle specific LinkedIn patterns and clean up tracking URLs
+    let content = html
+      // Remove style and script tags completely
+      .replace(/<style[^>]*>.*?<\/style>/gis, '')
+      .replace(/<script[^>]*>.*?<\/script>/gis, '')
+      // Clean up LinkedIn tracking URLs - extract the actual URL
+      .replace(/https:\/\/www\.linkedin\.com\/comm\/[^"'\s)]*(\?|&).*?(?=["'\s)]|$)/g, (match) => {
+        try {
+          const url = new URL(match);
+          // Try to extract the actual URL from LinkedIn redirects
+          const actualUrl = url.searchParams.get('url') || url.searchParams.get('trk') || match;
+          return actualUrl.startsWith('http') ? actualUrl : 'LinkedIn';
+        } catch {
+          return 'LinkedIn';
+        }
+      })
+      // Simplify other long URLs
+      .replace(/https:\/\/[^\s"'>]{50,}/g, (match) => {
+        try {
+          const url = new URL(match);
+          return `${url.hostname}`;
+        } catch {
+          return '[Link]';
+        }
+      })
+      // Replace HTML elements with text equivalents
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<p[^>]*>/gi, '')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<div[^>]*>/gi, '')
+      .replace(/<\/h[1-6]>/gi, '\n\n')
+      .replace(/<h[1-6][^>]*>/gi, '\n### ')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<\/ul>/gi, '\n')
+      .replace(/<ul[^>]*>/gi, '')
+      .replace(/<\/ol>/gi, '\n')
+      .replace(/<ol[^>]*>/gi, '')
+      // Simplify links to just show text with domain
+      .replace(/<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, (match, url, text) => {
+        try {
+          const domain = new URL(url).hostname;
+          return text.trim() ? `${text} (${domain})` : domain;
+        } catch {
+          return text || '[Link]';
+        }
+      })
+      // Remove remaining HTML tags
+      .replace(/<[^>]*>/g, '');
+    
+    // Decode HTML entities
+    tempDiv.innerHTML = content;
+    let decodedContent = tempDiv.textContent || tempDiv.innerText || '';
+    
+    // Clean up the content structure
+    decodedContent = decodedContent
+      // Remove excessive dashes and separators
+      .replace(/[-]{4,}/g, '\n---\n')
+      // Clean up tracking parameters and tokens
+      .replace(/[?&]([a-zA-Z]*[Tt]oken|[a-zA-Z]*[Ii]d|trk|lipi|mid|eid|loid)=[^&\s]*/g, '')
+      // Remove query parameters that look like tracking
+      .replace(/\?[a-zA-Z0-9%=&_-]{30,}/g, '')
+      // Clean up multiple line breaks
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      // Remove leading/trailing whitespace
+      .replace(/^\s+|\s+$/g, '')
+      // Normalize spaces
+      .replace(/[ \t]+/g, ' ')
+      // Clean up "See more" and unsubscribe sections
+      .replace(/See more on LinkedIn:.*$/gim, '\n[See more on LinkedIn]')
+      .replace(/This email was intended for.*$/gim, '\n[Email privacy notice]')
+      .replace(/You are receiving.*$/gim, '')
+      .replace(/Unsubscribe:.*$/gim, '\n[Unsubscribe link available]')
+      .replace(/Help:.*$/gim, '')
+      .replace(/© \d{4} LinkedIn Corporation.*$/gim, '');
+    
+    return decodedContent;
   };
 
   // Function to check if content is HTML
   const isHTML = (content: string): boolean => {
-    return content.trim().startsWith('<html') || content.includes('<body') || content.includes('<div');
+    return content.trim().includes('<') && (
+      content.includes('<html') || 
+      content.includes('<body') || 
+      content.includes('<div') ||
+      content.includes('<p') ||
+      content.includes('<br') ||
+      content.includes('<span')
+    );
+  };
+
+  // Function to render text with clickable links
+  const renderTextWithLinks = (text: string) => {
+    // Split text by URLs and render them as clickable links
+    const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (urlRegex.test(part)) {
+        try {
+          const url = new URL(part);
+          const displayText = url.hostname.length > 30 ? `${url.hostname.substring(0, 30)}...` : url.hostname;
+          return (
+            <a
+              key={index}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline break-all"
+            >
+              {displayText}
+            </a>
+          );
+        } catch {
+          return part;
+        }
+      }
+      return part;
+    });
   };
 
   // Get clean content for display
   const getDisplayContent = (content: string): string => {
     if (isHTML(content)) {
-      return extractTextFromHTML(content);
+      return extractAndFormatHTML(content);
     }
-    return content;
+    
+    // Clean up plain text content
+    return content
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      .trim();
   };
 
   // Handle AI summarization
@@ -80,6 +201,52 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({ email, isOpe
     } finally {
       setIsSummarizing(false);
     }
+  };
+
+  // Function to structure email content into readable sections
+  const structureEmailContent = (content: string) => {
+    const cleanContent = getDisplayContent(content);
+    
+    // Split into sections based on common patterns
+    const sections = cleanContent.split(/\n---\n|\n\n\n+/).filter(section => section.trim());
+    
+    return sections.map((section, index) => {
+      const trimmedSection = section.trim();
+      if (!trimmedSection) return null;
+      
+      // Check if it's a header section
+      if (trimmedSection.startsWith('###')) {
+        return (
+          <div key={index} className="mb-4">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              {trimmedSection.replace(/^###\s*/, '')}
+            </h3>
+          </div>
+        );
+      }
+      
+      // Check if it's a footer/metadata section
+      if (trimmedSection.includes('[Email privacy notice]') || 
+          trimmedSection.includes('[Unsubscribe link available]') ||
+          trimmedSection.includes('[See more on LinkedIn]')) {
+        return (
+          <div key={index} className="mt-6 pt-4 border-t border-white/10">
+            <div className="text-white/40 text-sm">
+              {renderTextWithLinks(trimmedSection)}
+            </div>
+          </div>
+        );
+      }
+      
+      // Regular content section
+      return (
+        <div key={index} className="mb-4">
+          <div className="text-white/90 leading-relaxed">
+            {renderTextWithLinks(trimmedSection)}
+          </div>
+        </div>
+      );
+    }).filter(Boolean);
   };
 
   return (
@@ -108,20 +275,20 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({ email, isOpe
         <div className="overflow-y-auto max-h-[calc(95vh-120px)] p-6">
           {/* Subject and Metadata */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white mb-4 leading-tight">{email.subject}</h1>
+            <h1 className="text-2xl font-bold text-white mb-4 leading-tight break-words">{email.subject}</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="flex items-center gap-3 p-4 bg-white/5 rounded-xl">
-                <User className="w-5 h-5 text-blue-400" />
-                <div>
+                <User className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
                   <p className="text-white/60 text-sm">From</p>
-                  <p className="text-white font-medium">{email.from}</p>
+                  <p className="text-white font-medium break-words">{email.from}</p>
                 </div>
               </div>
               
               <div className="flex items-center gap-3 p-4 bg-white/5 rounded-xl">
-                <Calendar className="w-5 h-5 text-green-400" />
-                <div>
+                <Calendar className="w-5 h-5 text-green-400 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
                   <p className="text-white/60 text-sm">Date</p>
                   <p className="text-white font-medium">{formatDate(email.date)}</p>
                 </div>
@@ -183,7 +350,7 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({ email, isOpe
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
               {aiSummary ? (
                 <div className="max-h-48 overflow-y-auto">
-                  <p className="text-white/90 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-white/90 leading-relaxed whitespace-pre-wrap break-words">
                     {aiSummary}
                   </p>
                 </div>
@@ -205,17 +372,23 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({ email, isOpe
             </h3>
             <div className="bg-white/5 border border-white/10 rounded-xl p-6">
               {email.body ? (
-                <div className="text-white/90 whitespace-pre-wrap leading-relaxed font-mono text-sm">
-                  {getDisplayContent(email.body)}
+                <div className="text-white/90 leading-relaxed break-words">
+                  <div className="email-content text-white/90 text-base">
+                    {structureEmailContent(email.body)}
+                  </div>
                 </div>
               ) : email.snippet ? (
-                <div className="text-white/90 whitespace-pre-wrap leading-relaxed">
-                  {getDisplayContent(email.snippet)}
+                <div className="text-white/90 leading-relaxed break-words">
+                  <div className="email-content text-white/90 text-base">
+                    {structureEmailContent(email.snippet)}
+                  </div>
                 </div>
               ) : (
-                <p className="text-white/60 italic">
-                  Full email content not available. This is a preview only.
-                </p>
+                <div className="text-center py-8">
+                  <p className="text-white/60 italic">
+                    Full email content not available. This is a preview only.
+                  </p>
+                </div>
               )}
             </div>
           </div>
