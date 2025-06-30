@@ -55,8 +55,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ userEmail, onShowAbout, on
             <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur opacity-30" />
-                <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 p-3 rounded-2xl">
-                  <span className="text-white font-bold text-xl">M</span>
+                <div className="relative bg-black/20 backdrop-blur-xl p-2 rounded-2xl border border-white/10">
+                  <img 
+                    src="/mailed-logo.svg" 
+                    alt="Mailed Logo"
+                    className="w-10 h-10"
+                  />
                 </div>
               </div>
               <div>

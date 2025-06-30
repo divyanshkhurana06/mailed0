@@ -151,8 +151,12 @@ export const EmailList: React.FC<EmailListProps> = ({ category, searchQuery, use
 
       {visibleEmails.length === 0 && (
         <div className="text-center py-16">
-          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">📧</span>
+          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <img 
+              src="/mailed-logo.svg" 
+              alt="Mailed Logo"
+              className="w-12 h-12 opacity-60"
+            />
           </div>
           <h3 className="text-white/60 text-lg mb-2">No emails found</h3>
           <p className="text-white/40">Try adjusting your search or filters</p>
