@@ -93,46 +93,99 @@ function captureComposeData(composeWindow) {
  */
 function getCurrentUserEmail() {
   try {
-    // Try to find the user email from Gmail's UI
-    const userInfoElements = document.querySelectorAll('[email], [data-email]');
-    for (const element of userInfoElements) {
-      const email = element.getAttribute('email') || element.getAttribute('data-email');
-      if (email && email.includes('@')) {
-        return email;
-      }
+    console.log('[Mailed Extension] Attempting to detect user email...');
+
+    // Method 1: Check URL for user identification (most reliable)
+    const urlMatch = window.location.href.match(/[/#]\/([^/]+)@([^/]+)/);
+    if (urlMatch) {
+      const email = `${urlMatch[1]}@${urlMatch[2]}`;
+      console.log('[Mailed Extension] Found email from URL:', email);
+      return email;
     }
 
-    // Try to get from account picker
-    const accountPicker = document.querySelector('[data-identifier]');
-    if (accountPicker) {
-      const email = accountPicker.getAttribute('data-identifier');
+    // Method 2: Look for account switcher or profile image with email
+    const accountElements = document.querySelectorAll('[data-email], [email], [title*="@"], [aria-label*="@"]');
+    for (const element of accountElements) {
+      const email = element.getAttribute('data-email') || 
+                   element.getAttribute('email') || 
+                   element.getAttribute('title') || 
+                   element.getAttribute('aria-label');
+      
       if (email && email.includes('@')) {
-        return email;
-      }
-    }
-
-    // Try to get from profile area
-    const profileElements = document.querySelectorAll('div[jsname] span[email]');
-    for (const element of profileElements) {
-      const email = element.getAttribute('email');
-      if (email && email.includes('@')) {
-        return email;
-      }
-    }
-
-    // Try alternative methods - sometimes Gmail stores email in different places
-    const settingsElements = document.querySelectorAll('[title*="@"], [aria-label*="@"]');
-    for (const element of settingsElements) {
-      const text = element.getAttribute('title') || element.getAttribute('aria-label');
-      if (text && text.includes('@')) {
-        const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        const emailMatch = email.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (emailMatch) {
+          console.log('[Mailed Extension] Found email from attributes:', emailMatch[1]);
           return emailMatch[1];
         }
       }
     }
 
-    console.warn('[Mailed Extension] Could not find user email, using unknown');
+    // Method 3: Check for Gmail settings or profile areas
+    const profileSelectors = [
+      'div[data-tooltip*="@"]',
+      'span[data-tooltip*="@"]', 
+      'div[title*="@"]',
+      '[jsname="CG5Sme"]', // Gmail profile container
+      '.gb_Eb', // Google bar profile
+      '.gb_db', // Account menu
+    ];
+
+    for (const selector of profileSelectors) {
+      const elements = document.querySelectorAll(selector);
+      for (const element of elements) {
+        const text = element.textContent || element.getAttribute('title') || element.getAttribute('data-tooltip');
+        if (text && text.includes('@')) {
+          const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          if (emailMatch) {
+            console.log('[Mailed Extension] Found email from profile elements:', emailMatch[1]);
+            return emailMatch[1];
+          }
+        }
+      }
+    }
+
+    // Method 4: Look in page source/scripts for email (last resort)
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+      if (script.textContent && script.textContent.includes('@gmail.com')) {
+        const emailMatch = script.textContent.match(/(['"][a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}['"])/);
+        if (emailMatch) {
+          const email = emailMatch[1].replace(/['"]/g, '');
+          console.log('[Mailed Extension] Found email from scripts:', email);
+          return email;
+        }
+      }
+    }
+
+    // Method 5: Check localStorage/sessionStorage
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        if (value && value.includes('@')) {
+          const emailMatch = value.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          if (emailMatch) {
+            console.log('[Mailed Extension] Found email from localStorage:', emailMatch[1]);
+            return emailMatch[1];
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[Mailed Extension] Could not access localStorage');
+    }
+
+    console.warn('[Mailed Extension] Could not detect user email, using fallback');
+    
+    // Fallback: Try to extract from page title or other elements
+    const pageTitle = document.title;
+    if (pageTitle && pageTitle.includes('@')) {
+      const emailMatch = pageTitle.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      if (emailMatch) {
+        console.log('[Mailed Extension] Found email from page title:', emailMatch[1]);
+        return emailMatch[1];
+      }
+    }
+
     return 'unknown';
   } catch (error) {
     console.error('[Mailed Extension] Error getting user email:', error);
@@ -149,7 +202,24 @@ function sendTrackedEmail() {
     return;
   }
 
-  const userEmail = getCurrentUserEmail();
+  let userEmail = getCurrentUserEmail();
+  
+  // If we couldn't detect the email, prompt the user once and store it
+  if (userEmail === 'unknown') {
+    const storedEmail = localStorage.getItem('mailed_user_email');
+    if (storedEmail) {
+      userEmail = storedEmail;
+      console.log('[Mailed Extension] Using stored email:', userEmail);
+    } else {
+      const promptedEmail = prompt('Mailed Extension: Please enter your Gmail address for tracking:');
+      if (promptedEmail && promptedEmail.includes('@')) {
+        userEmail = promptedEmail.trim();
+        localStorage.setItem('mailed_user_email', userEmail);
+        console.log('[Mailed Extension] Stored user email for future use:', userEmail);
+      }
+    }
+  }
+
   const payload = {
     toAddress: lastComposeData.to,
     subject: lastComposeData.subject,
