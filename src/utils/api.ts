@@ -2,7 +2,7 @@ import { Email, SentEmail } from '../types/email';
 
 // Use environment variable in production, fallback to localhost in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? 'https://your-backend-domain.onrender.com/api' : 'http://localhost:3000/api');
+  (import.meta.env.PROD ? 'https://mailed0.onrender.com/api' : 'http://localhost:3000/api');
 
 export const api = {
   // Google OAuth

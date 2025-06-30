@@ -2,4 +2,4 @@
 /*    /index.html   200
 
 # API redirects (if needed)
-/api/*  https://your-backend-name.onrender.com/api/:splat  200 
+/api/*  https://mailed0.onrender.com/api/:splat  200 

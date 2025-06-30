@@ -19,7 +19,7 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors({
   origin: [
-    'https://your-app-name.netlify.app', // Production frontend
+    'https://mailed.netlify.app',        // Production frontend
     'http://localhost:5173',              // Development frontend
     'http://localhost:3000',              // Development backend
     'https://mail.google.com'             // Gmail for extension
